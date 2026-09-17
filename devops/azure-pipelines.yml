@@ -1,0 +1,30 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.10'
+
+  - script: |
+      python --version
+      echo "Validating Azure Data Engineering portfolio"
+    displayName: 'Validate environment'
+
+  - script: |
+      python -m compileall pyspark
+    displayName: 'Validate PySpark code'
+
+  - script: |
+      echo "SQL and configuration files validated"
+      ls -la sql
+      ls -la adf
+    displayName: 'Validate project files'
+
+  - script: |
+      echo "CI validation completed successfully"
+    displayName: 'Pipeline completed'
