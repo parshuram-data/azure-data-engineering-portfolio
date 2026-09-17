@@ -1,0 +1,168 @@
+{
+  "name": "PL_Retail_Data_Engineering",
+  "properties": {
+    "description": "End-to-end Azure Data Factory pipeline for the Retail Data Platform using ADLS Gen2 and Azure Databricks.",
+
+    "parameters": {
+      "sourceFolder": {
+        "type": "String",
+        "defaultValue": "source"
+      },
+      "bronzeFolder": {
+        "type": "String",
+        "defaultValue": "bronze"
+      },
+      "silverFolder": {
+        "type": "String",
+        "defaultValue": "silver"
+      },
+      "goldFolder": {
+        "type": "String",
+        "defaultValue": "gold"
+      }
+    },
+
+    "activities": [
+      {
+        "name": "Lookup_Source_Metadata",
+        "type": "Lookup",
+        "description": "Reads source table and file metadata for metadata-driven processing.",
+        "typeProperties": {
+          "source": {
+            "type": "DelimitedTextSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings"
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+
+      {
+        "name": "ForEach_Source_Table",
+        "type": "ForEach",
+        "description": "Processes multiple source datasets dynamically.",
+        "dependsOn": [
+          {
+            "activity": "Lookup_Source_Metadata",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Lookup_Source_Metadata').output.value",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "Copy_To_Bronze",
+              "type": "Copy",
+              "description": "Copies raw source data into the ADLS Gen2 Bronze layer.",
+              "typeProperties": {
+                "source": {
+                  "type": "DelimitedTextSource",
+                  "storeSettings": {
+                    "type": "AzureBlobFSReadSettings"
+                  }
+                },
+                "sink": {
+                  "type": "DelimitedTextSink",
+                  "storeSettings": {
+                    "type": "AzureBlobFSWriteSettings"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+
+      {
+        "name": "Bronze_To_Silver_Databricks",
+        "type": "DatabricksNotebook",
+        "description": "Runs PySpark transformations to clean, deduplicate and standardize Bronze data.",
+        "dependsOn": [
+          {
+            "activity": "ForEach_Source_Table",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookPath": "/Shared/azure-data-engineering-portfolio/bronze_to_silver",
+          "baseParameters": {
+            "source_path": "@pipeline().parameters.bronzeFolder",
+            "target_path": "@pipeline().parameters.silverFolder"
+          }
+        }
+      },
+
+      {
+        "name": "Data_Quality_Checks",
+        "type": "DatabricksNotebook",
+        "description": "Validates null values, duplicate records, required columns and data quality rules.",
+        "dependsOn": [
+          {
+            "activity": "Bronze_To_Silver_Databricks",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookPath": "/Shared/azure-data-engineering-portfolio/data_quality_checks",
+          "baseParameters": {
+            "input_path": "@pipeline().parameters.silverFolder"
+          }
+        }
+      },
+
+      {
+        "name": "Silver_To_Gold_Databricks",
+        "type": "DatabricksNotebook",
+        "description": "Creates analytics-ready Gold datasets using PySpark and Delta Lake.",
+        "dependsOn": [
+          {
+            "activity": "Data_Quality_Checks",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookPath": "/Shared/azure-data-engineering-portfolio/silver_to_gold",
+          "baseParameters": {
+            "source_path": "@pipeline().parameters.silverFolder",
+            "target_path": "@pipeline().parameters.goldFolder"
+          }
+        }
+      },
+
+      {
+        "name": "Pipeline_Failure_Handling",
+        "type": "WebActivity",
+        "description": "Placeholder for failure notification such as email, Teams or Logic Apps.",
+        "dependsOn": [
+          {
+            "activity": "Silver_To_Gold_Databricks",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "url": "https://example.com/ADF-Failure-Notification",
+          "body": {
+            "pipeline": "@pipeline().Pipeline",
+            "runId": "@pipeline().RunId",
+            "status": "Failed"
+          }
+        }
+      }
+    ]
+  }
+}
