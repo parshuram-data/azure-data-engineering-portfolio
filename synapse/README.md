@@ -1,10 +1,8 @@
 # Azure Synapse Analytics
 
-This folder documents the serving and analytics layer of the Azure Retail Data Platform.
+This folder documents the analytical serving layer of the Azure Retail Data Platform.
 
-## Purpose
-
-Azure Synapse Analytics is used as the analytical serving layer for curated data produced by the data engineering pipeline.
+Azure Synapse Analytics is used to expose curated Gold data for downstream analytics and reporting.
 
 ## Data Flow
 
@@ -15,13 +13,19 @@ Source Systems
 Azure Data Factory
       |
       v
-ADLS Gen2
+ADLS Gen2 - Bronze
       |
       v
 Azure Databricks / PySpark
       |
       v
-Delta Lake
+ADLS Gen2 - Silver Delta
+      |
+      v
+Data Quality Checks
+      |
+      v
+ADLS Gen2 - Gold Delta
       |
       v
 Azure Synapse Analytics
