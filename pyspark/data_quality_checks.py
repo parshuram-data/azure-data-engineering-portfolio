@@ -146,6 +146,10 @@ order_null_date = orders_df \
     .filter(col("order_date").isNull()) \
     .count()
 
+order_null_price = orders_df \
+    .filter(col("unit_price").isNull()) \
+    .count()
+
 order_invalid_quantity = orders_df \
     .filter(col("quantity") <= 0) \
     .count()
@@ -160,6 +164,7 @@ print(f"NULL order IDs: {order_null_id}")
 print(f"NULL customer IDs: {order_null_customer_id}")
 print(f"NULL product IDs: {order_null_product_id}")
 print(f"NULL order dates: {order_null_date}")
+print(f"NULL unit prices: {order_null_price}")
 print(f"Invalid quantities: {order_invalid_quantity}")
 print(f"Negative unit prices: {order_invalid_price}")
 
@@ -226,6 +231,7 @@ quality_checks = [
     order_null_customer_id,
     order_null_product_id,
     order_null_date,
+    order_null_price,
     order_invalid_quantity,
     order_invalid_price,
 
