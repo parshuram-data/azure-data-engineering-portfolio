@@ -1,5 +1,5 @@
 SourceName,SourceType,SourcePath,TargetPath,LoadType,WatermarkColumn,TargetLayer,IsActive
-customers,CSV,data/customers.csv,bronze/customers,Incremental,signup_date,bronze,true
-orders,CSV,data/orders.csv,bronze/orders,Incremental,order_date,bronze,true
-products,CSV,data/products.csv,bronze/products,Full,,bronze,true
-payments,CSV,data/payments.csv,bronze/payments,Incremental,payment_date,bronze,true
+customers,CSV,data/customers.csv,customers,Incremental,signup_date,bronze,true
+orders,CSV,data/orders.csv,orders,Incremental,order_date,bronze,true
+products,CSV,data/products.csv,products,Full,,bronze,true
+payments,CSV,data/payments.csv,payments,Incremental,payment_date,bronze,true
