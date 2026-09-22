@@ -39,3 +39,14 @@ Order value is calculated during transformation:
 
 ```text
 order_value = quantity × unit_price
+
+### Payments
+
+| Column | Description |
+|---|---|
+| payment_id | Unique identifier for each payment |
+| order_id | Related order identifier |
+| payment_date | Date of payment |
+| payment_method | Payment method used |
+| amount | Payment amount |
+| payment_status | Status of the payment |
