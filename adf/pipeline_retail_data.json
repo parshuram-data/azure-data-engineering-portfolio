@@ -1,7 +1,7 @@
 {
   "name": "PL_Retail_Data_Engineering",
   "properties": {
-    "description": "Metadata-driven Azure Data Factory pipeline for the Retail Data Platform using parameterized ADLS Gen2 datasets, Bronze ingestion, Databricks transformations, data quality validation and Gold processing.",
+    "description": "Production-minded metadata-driven Azure Data Factory pipeline for the Retail Data Platform using ADLS Gen2, Databricks, PySpark, Delta Lake and Medallion architecture.",
 
     "parameters": {
       "bronzeFolder": {
@@ -22,12 +22,16 @@
       {
         "name": "Lookup_Source_Metadata",
         "type": "Lookup",
-        "description": "Reads all source configuration records from the metadata control file.",
+        "description": "Reads the centralized source configuration used to drive metadata-based ingestion.",
+
         "typeProperties": {
           "source": {
             "type": "DelimitedTextSource",
             "storeSettings": {
               "type": "AzureBlobFSReadSettings"
+            },
+            "formatSettings": {
+              "type": "DelimitedTextReadSettings"
             }
           },
           "firstRowOnly": false
@@ -37,7 +41,8 @@
       {
         "name": "Filter_Active_Sources",
         "type": "Filter",
-        "description": "Processes only metadata records where IsActive is true.",
+        "description": "Processes only active source configurations from the metadata control table.",
+
         "dependsOn": [
           {
             "activity": "Lookup_Source_Metadata",
@@ -46,6 +51,7 @@
             ]
           }
         ],
+
         "typeProperties": {
           "items": {
             "value": "@activity('Lookup_Source_Metadata').output.value",
@@ -61,7 +67,8 @@
       {
         "name": "ForEach_Source_Table",
         "type": "ForEach",
-        "description": "Iterates through active source configurations and dynamically copies each source into the Bronze layer.",
+        "description": "Iterates through active source configurations and executes ingestion dynamically.",
+
         "dependsOn": [
           {
             "activity": "Filter_Active_Sources",
@@ -70,6 +77,7 @@
             ]
           }
         ],
+
         "typeProperties": {
           "items": {
             "value": "@activity('Filter_Active_Sources').output.value",
@@ -77,20 +85,59 @@
           },
           "isSequential": false,
           "batchCount": 4,
+
           "activities": [
             {
               "name": "Copy_To_Bronze",
               "type": "Copy",
-              "description": "Copies the source CSV defined by metadata into its configured Bronze target path.",
+              "description": "Copies the configured source file into the ADLS Gen2 Bronze layer using metadata-driven source and target paths.",
+
+              "typeProperties": {
+                "source": {
+                  "type": "DelimitedTextSource",
+                  "storeSettings": {
+                    "type": "AzureBlobFSReadSettings"
+                  },
+                  "formatSettings": {
+                    "type": "DelimitedTextReadSettings"
+                  }
+                },
+
+                "sink": {
+                  "type": "DelimitedTextSink",
+                  "storeSettings": {
+                    "type": "AzureBlobFSWriteSettings"
+                  },
+                  "formatSettings": {
+                    "type": "DelimitedTextWriteSettings",
+                    "quoteAllText": false,
+                    "fileExtension": ".csv"
+                  }
+                },
+
+                "enableStaging": false,
+
+                "translator": {
+                  "type": "TabularTranslator",
+                  "typeConversion": true,
+                  "typeConversionSettings": {
+                    "allowDataTruncation": true,
+                    "treatBooleanAsNumber": false
+                  }
+                }
+              },
+
               "inputs": [
                 {
                   "referenceName": "ds_retail_source_csv",
                   "type": "DatasetReference",
+
                   "parameters": {
                     "filePath": {
                       "value": "@substring(item().SourcePath, 0, lastIndexOf(item().SourcePath, '/'))",
                       "type": "Expression"
                     },
+
                     "fileName": {
                       "value": "@substring(item().SourcePath, add(lastIndexOf(item().SourcePath, '/'), 1), sub(length(item().SourcePath), add(lastIndexOf(item().SourcePath, '/'), 1)))",
                       "type": "Expression"
@@ -98,45 +145,25 @@
                   }
                 }
               ],
+
               "outputs": [
                 {
                   "referenceName": "ds_retail_bronze_csv",
                   "type": "DatasetReference",
+
                   "parameters": {
                     "folderPath": {
                       "value": "@concat(pipeline().parameters.bronzeFolder, '/', item().TargetPath)",
                       "type": "Expression"
                     },
+
                     "fileName": {
                       "value": "@concat(item().SourceName, '.csv')",
                       "type": "Expression"
                     }
                   }
                 }
-              ],
-              "typeProperties": {
-                "source": {
-                  "type": "DelimitedTextSource",
-                  "storeSettings": {
-                    "type": "AzureBlobFSReadSettings",
-                    "recursive": false
-                  },
-                  "formatSettings": {
-                    "type": "DelimitedTextReadSettings"
-                  }
-                },
-                "sink": {
-                  "type": "DelimitedTextSink",
-                  "storeSettings": {
-                    "type": "AzureBlobFSWriteSettings",
-                    "copyBehavior": "PreserveHierarchy"
-                  },
-                  "formatSettings": {
-                    "type": "DelimitedTextWriteSettings",
-                    "quoteAllText": false
-                  }
-                }
-              }
+              ]
             }
           ]
         }
@@ -145,7 +172,8 @@
       {
         "name": "Bronze_To_Silver_Databricks",
         "type": "DatabricksNotebook",
-        "description": "Runs PySpark transformations to clean, standardize and deduplicate Bronze datasets before writing Delta tables to Silver.",
+        "description": "Transforms Bronze data using PySpark, applies standardization and deduplication, and writes curated Delta datasets to the Silver layer.",
+
         "dependsOn": [
           {
             "activity": "ForEach_Source_Table",
@@ -154,11 +182,20 @@
             ]
           }
         ],
+
         "typeProperties": {
           "notebookPath": "/Shared/azure-data-engineering-portfolio/bronze_to_silver",
+
           "baseParameters": {
-            "source_path": "@pipeline().parameters.bronzeFolder",
-            "target_path": "@pipeline().parameters.silverFolder"
+            "source_path": {
+              "value": "@pipeline().parameters.bronzeFolder",
+              "type": "Expression"
+            },
+
+            "target_path": {
+              "value": "@pipeline().parameters.silverFolder",
+              "type": "Expression"
+            }
           }
         }
       },
@@ -166,7 +203,8 @@
       {
         "name": "Data_Quality_Checks",
         "type": "DatabricksNotebook",
-        "description": "Validates required fields, duplicates and business data quality rules on Silver datasets.",
+        "description": "Executes Silver-layer data quality checks for null values, duplicate keys and invalid business values.",
+
         "dependsOn": [
           {
             "activity": "Bronze_To_Silver_Databricks",
@@ -175,10 +213,15 @@
             ]
           }
         ],
+
         "typeProperties": {
           "notebookPath": "/Shared/azure-data-engineering-portfolio/data_quality_checks",
+
           "baseParameters": {
-            "input_path": "@pipeline().parameters.silverFolder"
+            "input_path": {
+              "value": "@pipeline().parameters.silverFolder",
+              "type": "Expression"
+            }
           }
         }
       },
@@ -186,7 +229,8 @@
       {
         "name": "Silver_To_Gold_Databricks",
         "type": "DatabricksNotebook",
-        "description": "Creates analytics-ready Gold datasets using PySpark and Delta Lake.",
+        "description": "Creates analytics-ready Gold Delta datasets from validated Silver data for downstream reporting and analytics.",
+
         "dependsOn": [
           {
             "activity": "Data_Quality_Checks",
@@ -195,11 +239,20 @@
             ]
           }
         ],
+
         "typeProperties": {
           "notebookPath": "/Shared/azure-data-engineering-portfolio/silver_to_gold",
+
           "baseParameters": {
-            "source_path": "@pipeline().parameters.silverFolder",
-            "target_path": "@pipeline().parameters.goldFolder"
+            "source_path": {
+              "value": "@pipeline().parameters.silverFolder",
+              "type": "Expression"
+            },
+
+            "target_path": {
+              "value": "@pipeline().parameters.goldFolder",
+              "type": "Expression"
+            }
           }
         }
       },
@@ -207,7 +260,8 @@
       {
         "name": "Pipeline_Failure_Handling",
         "type": "WebActivity",
-        "description": "Placeholder for production failure notification integration such as Azure Logic Apps, Teams or email.",
+        "description": "Placeholder for integration with an enterprise notification mechanism such as Azure Logic Apps, Microsoft Teams or an email notification service.",
+
         "dependsOn": [
           {
             "activity": "Silver_To_Gold_Databricks",
@@ -216,12 +270,15 @@
             ]
           }
         ],
+
         "typeProperties": {
           "method": "POST",
+
           "url": "https://example.com/ADF-Failure-Notification",
+
           "body": {
-            "pipeline": "@pipeline().Pipeline",
-            "runId": "@pipeline().RunId",
+            "pipeline": "@{pipeline().Pipeline}",
+            "runId": "@{pipeline().RunId}",
             "status": "Failed"
           }
         }
