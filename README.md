@@ -1,340 +1,413 @@
+# 🚀 Azure Retail Data Engineering Portfolio
 
-# Azure Retail Data Engineering Portfolio
+An end-to-end Azure Data Engineering project demonstrating how retail data can be ingested, processed, validated, modeled, and served for analytics and reporting.
 
-An end-to-end Azure Data Engineering project demonstrating a modern cloud data platform for retail analytics.
+The solution follows a modern **Medallion Architecture**:
 
-## Project Overview
-
-This project demonstrates how retail data can be ingested, stored, transformed, validated, modeled, and served for analytics and reporting.
-
-The solution follows a Medallion Architecture:
-
-**Bronze → Silver → Gold → Analytics → Reporting**
-
-The project uses Azure Data Factory for orchestration, Azure Data Lake Storage Gen2 for scalable storage, PySpark for data transformation, Azure Synapse Analytics for analytical serving, and Power BI for reporting.
+**Sources → Bronze → Silver → Gold → Analytics → Reporting**
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ![Azure Retail Data Engineering Architecture](architecture/Architecture.png)
 
 ### End-to-End Data Flow
 
-**Source Systems**
-- ERP systems
-- CRM systems
-- SQL Server
-- CSV / Excel files
-- REST APIs
-
-↓
-
-**Azure Data Factory**
-
-- Data ingestion
-- Pipeline orchestration
-- Scheduling
-- Incremental loading
-- Monitoring
-
-↓
-
-**Azure Data Lake Storage Gen2**
-
-### Bronze Layer
-- Raw source data
-- Original file format preserved
-- Historical backup
-- Schema preservation
-
-↓
-
-**Azure Databricks / PySpark**
-
-### Silver Layer
-- Data cleansing
-- Deduplication
-- Data quality validation
-- Standardization
-- Business rules
-
-↓
-
-**Azure Data Lake Storage Gen2**
-
-### Gold Layer
-- Curated business data
-- Aggregations
-- Fact and dimension datasets
-- Analytics-ready data
-
-↓
-
-**Azure Synapse Analytics**
-
-- Analytical views
-- SQL-based reporting layer
-- Optimized analytical queries
-
-↓
-
-**Power BI**
-
-- Business dashboards
-- KPI reporting
-- Retail analytics
+```text
+ERP / CRM / SQL Server / CSV / REST APIs
+                    │
+                    ▼
+           Azure Data Factory
+                    │
+                    ▼
+             ADLS Gen2
+             Bronze Layer
+                    │
+                    ▼
+       Azure Databricks / PySpark
+                    │
+                    ▼
+             ADLS Gen2
+             Silver Layer
+                    │
+                    ▼
+       Azure Databricks / PySpark
+                    │
+                    ▼
+             ADLS Gen2
+              Gold Layer
+                    │
+                    ▼
+          Azure Synapse Analytics
+                    │
+                    ▼
+                Power BI
+````
 
 ---
 
-## Technology Stack
+## 📌 Project Overview
 
-| Technology | Purpose |
-|---|---|
-| Azure Data Factory | Data ingestion and orchestration |
-| Azure Data Lake Storage Gen2 | Scalable cloud data storage |
-| Azure Databricks | Distributed data processing |
-| PySpark | Data transformation |
-| Delta Lake | Reliable data storage and processing |
-| Azure Synapse Analytics | Analytical serving layer |
-| SQL | Data transformation and analytics |
-| Power BI | Reporting and visualization |
-| Azure DevOps | CI/CD and source control |
-| GitHub Actions | Automated validation |
+This project demonstrates a production-style Azure data platform for retail analytics.
+
+The platform handles data from multiple source systems and processes it through a scalable cloud architecture.
+
+### Key capabilities
+
+* Batch data ingestion
+* Incremental data loading
+* Metadata-driven pipelines
+* Medallion architecture
+* PySpark transformations
+* Delta Lake processing
+* Data quality validation
+* SQL analytics
+* Dimensional data modeling
+* Azure Synapse analytical serving
+* Power BI reporting
+* CI/CD automation
+* Monitoring and error handling
 
 ---
 
-## Medallion Architecture
+# 🔄 Data Engineering Pipeline
 
-### Bronze Layer
+The pipeline follows these major stages:
+
+```text
+Source Systems
+      ↓
+Azure Data Factory
+      ↓
+ADLS Gen2 - Bronze
+      ↓
+Databricks / PySpark
+      ↓
+ADLS Gen2 - Silver
+      ↓
+Databricks / PySpark
+      ↓
+ADLS Gen2 - Gold
+      ↓
+Azure Synapse
+      ↓
+Power BI
+```
+
+---
+
+# 🥉 Bronze Layer
 
 The Bronze layer stores raw data received from source systems.
 
-Key characteristics:
+### Characteristics
 
-- Raw data is preserved
-- Minimal transformation
-- Historical data retention
-- Supports data recovery and reprocessing
+* Raw source data
+* Minimal transformation
+* Historical preservation
+* Source-system structure retained
+* Supports reprocessing and auditing
 
-### Silver Layer
+### Example sources
+
+* ERP
+* CRM
+* SQL Server
+* CSV / Excel
+* REST APIs
+
+---
+
+# 🥈 Silver Layer
 
 The Silver layer contains cleaned and standardized data.
 
-Key processing includes:
+### Transformations
 
-- Removing duplicates
-- Handling null values
-- Data type standardization
-- Data quality checks
-- Applying business rules
-- Data cleansing
+* Null handling
+* Data type standardization
+* Deduplication
+* Data cleansing
+* Business-rule validation
+* Schema validation
+* Incremental processing
+* Standardized column naming
 
-### Gold Layer
-
-The Gold layer contains curated data optimized for analytics.
-
-Key processing includes:
-
-- Business aggregations
-- Fact and dimension modeling
-- Analytical datasets
-- Reporting-ready data
+PySpark is used for scalable transformations.
 
 ---
 
-## Data Sources
+# 🥇 Gold Layer
 
-The project uses sample retail datasets representing:
+The Gold layer contains curated business-ready datasets.
 
-- Customers
-- Products
-- Orders
-- Payments
+### Features
 
-Sample data is available in the `data/` directory.
+* Business-level aggregations
+* Fact and dimension tables
+* Star-schema modeling
+* Reporting-ready datasets
+* Analytical optimization
+
+Example model:
+
+```text
+                 DimCustomer
+                     │
+                     │
+DimProduct ─── FactSales ─── DimDate
+                     │
+                     │
+                DimStore
+```
 
 ---
 
-## Incremental Load Strategy
+# 🔄 Incremental Loading
 
-The solution uses an incremental loading approach instead of processing the complete dataset every time.
+The solution uses incremental loading instead of processing the entire dataset during every pipeline execution.
 
-A watermark such as a last modified timestamp can be used to identify newly added or modified records.
+A watermark such as:
+
+```text
+LastModifiedDate
+```
+
+is used to identify newly created or modified records.
+
+### Benefits
+
+* Reduced processing time
+* Lower compute consumption
+* Reduced data movement
+* Better scalability
+* Efficient daily processing
+
+---
+
+# ⚙️ Azure Data Factory
+
+Azure Data Factory is used for orchestration and ingestion.
+
+### Pipeline capabilities
+
+* Source-to-landing ingestion
+* Incremental loads
+* Parameterized pipelines
+* Metadata-driven processing
+* Lookup activities
+* ForEach processing
+* Pipeline dependencies
+* Retry mechanisms
+* Failure handling
+* Monitoring and alerts
+
+### Metadata-driven approach
+
+Instead of creating separate pipelines for every table, configuration metadata can control:
+
+```text
+Source Table
+Target Path
+Load Type
+Watermark Column
+Target Layer
+Active Flag
+```
+
+This allows the framework to process multiple datasets dynamically.
+
+---
+
+# ⚡ Azure Databricks & PySpark
+
+Azure Databricks is used for distributed data processing.
+
+### PySpark processing includes
+
+* Data cleansing
+* Deduplication
+* Data transformations
+* Joins
+* Aggregations
+* Business rules
+* Data quality checks
+* Incremental processing
+* Data modeling
+
+---
+
+# 🗄️ Delta Lake
+
+Delta Lake is used for reliable analytical storage.
+
+### Key capabilities
+
+* ACID transactions
+* Schema enforcement
+* Schema evolution
+* MERGE operations
+* Time Travel
+* Reliable incremental processing
+* Optimized analytical queries
+
+Example incremental merge:
+
+```sql
+MERGE INTO target t
+USING source s
+ON t.CustomerID = s.CustomerID
+
+WHEN MATCHED THEN
+  UPDATE SET *
+
+WHEN NOT MATCHED THEN
+  INSERT *
+```
+
+---
+
+# 🧹 Data Quality
+
+Data quality checks are performed during processing.
+
+### Validation examples
+
+* Null checks
+* Duplicate checks
+* Schema validation
+* Data type validation
+* Referential integrity
+* Business-rule validation
+* Record-count validation
 
 Example:
 
-```sql
-SELECT *
-FROM source_table
-WHERE last_modified_date > @watermark;
-````
-
-This approach helps reduce unnecessary data movement and improves pipeline efficiency.
-
-The incremental load strategy is documented in:
-
-`adf/incremental_load.md`
+```text
+Source Records
+      ↓
+Transformation
+      ↓
+Data Quality Checks
+      ↓
+Valid Records → Silver / Gold
+Invalid Records → Error / Quarantine
+```
 
 ---
 
-## Data Quality
+# 📊 SQL Analytics
 
-Data quality checks are applied during the transformation process.
+SQL is used for analytical queries and business insights.
 
 Examples include:
 
-* Null value validation
-* Duplicate record detection
-* Required column validation
-* Data type validation
-* Record count checks
-* Business rule validation
-
-Implementation:
-
-`pyspark/data_quality_checks.py`
-
----
-
-## PySpark Processing
-
-The project includes PySpark pipelines for moving data through the Medallion layers.
-
-### Bronze → Silver
-
-`pyspark/bronze_to_silver.py`
-
-Responsibilities include:
-
-* Reading raw data
-* Cleaning records
-* Removing duplicates
-* Applying transformations
-* Performing data quality checks
-* Writing curated Silver data
-
-### Silver → Gold
-
-`pyspark/silver_to_gold.py`
-
-Responsibilities include:
-
-* Reading Silver datasets
-* Applying business transformations
-* Creating analytical datasets
-* Performing aggregations
-* Preparing fact and dimension data
-
----
-
-## SQL Analytics
-
-SQL scripts are organized under:
-
-`sql/`
-
-### SQL components
-
-* Table creation
-* Data transformations
-* Analytical queries
-
-Files:
-
-* `01_create_tables.sql`
-* `02_transformations.sql`
-* `03_analytics.sql`
-
-The analytics layer demonstrates SQL techniques such as:
-
-* Aggregations
-* Joins
-* Window functions
-* Filtering
-* Business KPIs
-
----
-
-## Azure Data Factory
-
-ADF is used as the orchestration layer.
-
-The pipeline design includes:
-
-* Source ingestion
-* Incremental loading
-* Pipeline parameters
-* Data movement
-* Transformation orchestration
-* Monitoring and failure handling
-
-ADF documentation:
-
-`adf/README.md`
-
-Pipeline definition:
-
-`adf/pipeline_retail_data.json`
-
----
-
-## Azure Synapse Analytics
-
-Azure Synapse acts as the analytical serving layer.
-
-The project contains analytical views designed to expose curated Gold-layer data for reporting.
-
-Synapse implementation:
-
-`synapse/01_create_views.sql`
-
-Documentation:
-
-`synapse/README.md`
-
----
-
-## Power BI Reporting
-
-Power BI consumes curated analytical data from Azure Synapse Analytics.
-
-The reporting layer is designed to provide:
-
-* Retail KPIs
-* Customer analysis
+* Customer sales analysis
 * Product performance
-* Order analysis
-* Payment analysis
-* Business reporting
-
-Documentation:
-
-`powerbi/README.md`
-
----
-
-## CI/CD
-
-Azure DevOps and GitHub Actions are used to demonstrate CI/CD practices.
-
-The CI workflow performs automated validation whenever changes are pushed to the repository.
-
-GitHub Actions workflow:
-
-`.github/workflows/ci.yml`
-
-Azure DevOps documentation:
-
-`devops/README.md`
-
-Pipeline configuration:
-
-`devops/azure-pipelines.yml`
+* Daily revenue
+* Top customers
+* Store performance
+* Ranking analysis
+* Window-function analysis
+* Aggregations
 
 ---
 
-## Repository Structure
+# 🧠 Azure Synapse Analytics
+
+Azure Synapse provides the analytical serving layer.
+
+The Gold datasets are exposed through analytical structures optimized for reporting and BI consumption.
+
+### Synapse responsibilities
+
+* Analytical queries
+* Views
+* Curated datasets
+* Reporting access
+* SQL-based analytics
+
+---
+
+# 📈 Power BI
+
+Power BI consumes curated Gold-layer data for reporting.
+
+### Example reporting areas
+
+* Sales performance
+* Revenue trends
+* Customer analytics
+* Product performance
+* Store performance
+* Daily / monthly KPIs
+
+---
+
+# 🚀 Performance Optimization
+
+The platform demonstrates several Spark and Delta Lake optimization techniques.
+
+### PySpark optimization
+
+* Partition pruning
+* Broadcast joins
+* Handling data skew
+* Adaptive Query Execution
+* Efficient partition sizing
+* Reducing unnecessary shuffles
+* Caching where appropriate
+
+### Delta Lake optimization
+
+* OPTIMIZE
+* Z-ORDER
+* Small-file management
+* Efficient MERGE operations
+
+### Example improvement
+
+A representative processing workload of approximately **200 GB** was optimized from around:
+
+**100 minutes → 60 minutes**
+
+Approximately **40% reduction in processing time**.
+
+---
+
+# 🔁 CI/CD
+
+The repository includes CI/CD documentation and GitHub Actions automation.
+
+### Development flow
+
+```text
+Developer
+    ↓
+Git
+    ↓
+Pull Request
+    ↓
+Validation
+    ↓
+CI Pipeline
+    ↓
+Deployment
+```
+
+The project demonstrates concepts such as:
+
+* Source control
+* Automated validation
+* CI pipelines
+* Deployment workflows
+* Environment-based configuration
+* Azure DevOps / GitHub Actions
+
+---
+
+# 📁 Repository Structure
 
 ```text
 azure-data-engineering-portfolio/
@@ -344,9 +417,7 @@ azure-data-engineering-portfolio/
 │       └── ci.yml
 │
 ├── adf/
-│   ├── README.md
-│   ├── incremental_load.md
-│   └── pipeline_retail_data.json
+│   └── README.md
 │
 ├── architecture/
 │   ├── Architecture.png
@@ -354,11 +425,7 @@ azure-data-engineering-portfolio/
 │   └── architecture.md
 │
 ├── data/
-│   ├── customers.csv
-│   ├── orders.csv
-│   ├── payments.csv
-│   ├── products.csv
-│   └── data_dictionary.md
+│   └── README.md
 │
 ├── devops/
 │   ├── README.md
@@ -368,19 +435,12 @@ azure-data-engineering-portfolio/
 │   └── README.md
 │
 ├── pyspark/
-│   ├── bronze_to_silver.py
-│   ├── data_quality_checks.py
-│   ├── silver_to_gold.py
 │   └── README.md
 │
 ├── sql/
-│   ├── 01_create_tables.sql
-│   ├── 02_transformations.sql
-│   ├── 03_analytics.sql
 │   └── README.md
 │
 ├── synapse/
-│   ├── 01_create_views.sql
 │   └── README.md
 │
 └── README.md
@@ -388,34 +448,91 @@ azure-data-engineering-portfolio/
 
 ---
 
-## Key Data Engineering Concepts Demonstrated
+# 🛠️ Technology Stack
 
-* End-to-end Azure Data Engineering
-* Medallion Architecture
-* ETL / ELT
-* Incremental data loading
-* Data quality validation
-* Data cleansing
-* Deduplication
-* PySpark transformations
-* SQL analytics
-* Fact and dimension modeling
-* Analytical views
-* Cloud data lake architecture
-* Pipeline orchestration
-* CI/CD
-* Source control
-* Monitoring and validation
+| Technology           | Purpose                        |
+| -------------------- | ------------------------------ |
+| Azure Data Factory   | Data ingestion & orchestration |
+| Azure Data Lake Gen2 | Scalable data storage          |
+| Azure Databricks     | Distributed data processing    |
+| PySpark              | Data transformation            |
+| Delta Lake           | Reliable analytical storage    |
+| Azure Synapse        | Analytical serving             |
+| SQL                  | Analytics & querying           |
+| Power BI             | Reporting & visualization      |
+| Azure DevOps         | CI/CD                          |
+| GitHub Actions       | Automation                     |
+| Python               | Data engineering & automation  |
 
 ---
 
-## Project Outcome
+# 🎯 Key Data Engineering Skills
 
-This portfolio demonstrates the design of a modern Azure-based data engineering solution covering the complete data lifecycle:
+* Azure Data Engineering
+* ETL / ELT
+* Azure Data Factory
+* Azure Databricks
+* PySpark
+* ADLS Gen2
+* Delta Lake
+* Azure Synapse
+* SQL
+* Data Modeling
+* Medallion Architecture
+* Incremental Loading
+* Metadata-Driven Pipelines
+* Data Quality
+* Performance Optimization
+* CI/CD
+* Git
+* Power BI
 
-**Ingestion → Storage → Transformation → Data Quality → Modeling → Analytics → Reporting → CI/CD**
+---
 
-The project is structured to demonstrate practical data engineering concepts using commonly used Azure services and open-source development practices.
+# 📌 Project Highlights
+
+### End-to-End Architecture
+
+Designed a complete Azure-based data engineering architecture from ingestion through analytics and reporting.
+
+### Scalable Processing
+
+Used Databricks and PySpark for distributed processing of large datasets.
+
+### Incremental Processing
+
+Implemented watermark-based incremental loading to avoid unnecessary full data processing.
+
+### Medallion Architecture
+
+Implemented:
+
+**Bronze → Silver → Gold**
+
+for controlled data refinement.
+
+### Performance Engineering
+
+Applied Spark and Delta Lake optimization techniques to reduce processing time.
+
+### Production-Oriented Design
+
+Included data quality, monitoring, CI/CD, error handling, and documentation practices.
+
+---
+
+## 👨‍💻 About
+
+**Parshuram**
+Azure Data Engineer
+
+Specializing in:
+
+**Azure Data Factory | Azure Databricks | PySpark | ADLS Gen2 | Azure Synapse | Delta Lake | SQL | Data Engineering**
+
+---
+
+⭐ If you find this project useful, feel free to explore the repository and its individual components.
 
 ```
 
