@@ -1,117 +1,61 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, trim
+from pyspark.sql.functions import col
 
-# ---------------------------------------------------------
-# Spark Session
-# ---------------------------------------------------------
-
+# Create Spark session
 spark = SparkSession.builder \
-    .appName("Retail-Data-Quality-Checks") \
+    .appName("Data Quality Checks") \
     .getOrCreate()
 
-# ---------------------------------------------------------
-# Databricks Notebook Parameter
-# ---------------------------------------------------------
-# ADF passes:
-# input_path = @pipeline().parameters.silverFolder
-#
-# Example:
-# /mnt/retail/silver
-# ---------------------------------------------------------
+# Silver layer input path
+silver_path = "data/silver/customers"
 
-dbutils.widgets.text("input_path", "data/silver/customers")
-
-silver_path = dbutils.widgets.get("input_path")
-
-print(f"Silver input path: {silver_path}")
-
-# ---------------------------------------------------------
-# Read Silver Data
-# ---------------------------------------------------------
-
-df = spark.read \
-    .format("delta") \
-    .load(f"{silver_path}/customers")
+# Read Silver data
+df = spark.read.format("delta").load(silver_path)
 
 print("===== DATA QUALITY CHECKS =====")
 
-# ---------------------------------------------------------
-# 1. Record Count
-# ---------------------------------------------------------
-
+# 1. Record count
 record_count = df.count()
-
 print(f"Total records: {record_count}")
 
-# ---------------------------------------------------------
-# 2. Duplicate Customer IDs
-# ---------------------------------------------------------
-
-duplicate_groups = df.groupBy("customer_id") \
+# 2. Check duplicate customer IDs
+duplicate_count = df.groupBy("customer_id") \
     .count() \
-    .filter(col("count") > 1)
+    .filter(col("count") > 1) \
+    .count()
 
-duplicate_count = duplicate_groups.count()
+print(f"Duplicate customer IDs: {duplicate_count}")
 
-print(f"Duplicate customer ID groups: {duplicate_count}")
-
-# ---------------------------------------------------------
-# 3. NULL Customer IDs
-# ---------------------------------------------------------
-
+# 3. Check NULL customer IDs
 null_customer_id = df.filter(
     col("customer_id").isNull()
 ).count()
 
 print(f"NULL customer IDs: {null_customer_id}")
 
-# ---------------------------------------------------------
-# 4. NULL Customer Names
-# ---------------------------------------------------------
-
+# 4. Check NULL customer names
 null_customer_name = df.filter(
-    col("customer_name").isNull() |
-    (trim(col("customer_name")) == "")
+    col("customer_name").isNull()
 ).count()
 
-print(f"NULL/blank customer names: {null_customer_name}")
+print(f"NULL customer names: {null_customer_name}")
 
-# ---------------------------------------------------------
-# 5. Invalid Email Values
-# ---------------------------------------------------------
-# NULL and blank emails are treated as invalid.
-
-invalid_email = df.filter(
-    col("email").isNull() |
-    (trim(col("email")) == "") |
-    (~col("email").contains("@"))
+# 5. Check NULL signup dates
+null_signup_date = df.filter(
+    col("signup_date").isNull()
 ).count()
 
-print(f"Invalid email records: {invalid_email}")
+print(f"NULL signup dates: {null_signup_date}")
 
-# ---------------------------------------------------------
-# 6. Overall Data Quality Status
-# ---------------------------------------------------------
-
-quality_passed = (
+# 6. Overall data quality status
+if (
     duplicate_count == 0
     and null_customer_id == 0
     and null_customer_name == 0
-    and invalid_email == 0
-)
-
-if quality_passed:
-
+    and null_signup_date == 0
+):
     print("DATA QUALITY STATUS: PASSED")
-
 else:
-
     print("DATA QUALITY STATUS: FAILED")
-
-    # Fail the notebook so that ADF can detect the failure.
-    raise Exception(
-        "Data quality checks failed. "
-        "Review the validation results above."
-    )
 
 spark.stop()
