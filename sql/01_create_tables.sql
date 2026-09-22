@@ -1,5 +1,28 @@
+-- =========================================================
 -- Azure Retail Data Platform
--- Create raw/staging tables
+-- SQL Table Definitions
+-- =========================================================
+-- Purpose:
+-- Defines the source-aligned tables used for SQL
+-- transformations and analytical processing.
+--
+-- Source datasets:
+--   customers.csv
+--   products.csv
+--   orders.csv
+--   payments.csv
+--
+-- Note:
+-- order_value is a derived metric:
+-- quantity * unit_price
+-- It is calculated during transformation rather than
+-- stored in the source-aligned orders table.
+-- =========================================================
+
+
+-- =========================================================
+-- Customers
+-- =========================================================
 
 CREATE TABLE customers (
     customer_id VARCHAR(20),
@@ -9,12 +32,22 @@ CREATE TABLE customers (
     signup_date DATE
 );
 
+
+-- =========================================================
+-- Products
+-- =========================================================
+
 CREATE TABLE products (
     product_id VARCHAR(20),
     product_name VARCHAR(100),
     category VARCHAR(100),
     price DECIMAL(12,2)
 );
+
+
+-- =========================================================
+-- Orders
+-- =========================================================
 
 CREATE TABLE orders (
     order_id VARCHAR(20),
@@ -25,6 +58,11 @@ CREATE TABLE orders (
     unit_price DECIMAL(12,2),
     status VARCHAR(30)
 );
+
+
+-- =========================================================
+-- Payments
+-- =========================================================
 
 CREATE TABLE payments (
     payment_id VARCHAR(20),
