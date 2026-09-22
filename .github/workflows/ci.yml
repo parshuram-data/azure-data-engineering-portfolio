@@ -13,21 +13,67 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ---------------------------------------------------
+      # Checkout Repository
+      # ---------------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # ---------------------------------------------------
+      # Set Up Python
+      # ---------------------------------------------------
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ---------------------------------------------------
+      # Install Dependencies
+      # ---------------------------------------------------
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pyspark
+
+      # ---------------------------------------------------
+      # Validate PySpark Files
+      # ---------------------------------------------------
 
       - name: Validate PySpark files
         run: |
           python -m py_compile pyspark/bronze_to_silver.py
           python -m py_compile pyspark/silver_to_gold.py
           python -m py_compile pyspark/data_quality_checks.py
+
+      # ---------------------------------------------------
+      # Validate JSON Files
+      # ---------------------------------------------------
+
+      - name: Validate JSON files
+        run: |
+          python -m json.tool adf/pipeline_retail_data.json > /dev/null
+
+      # ---------------------------------------------------
+      # Validate Required Project Files
+      # ---------------------------------------------------
+
+      - name: Validate project structure
+        run: |
+          test -f README.md
+          test -f adf/pipeline_retail_data.json
+          test -f adf/metadata/pipeline_config.csv
+          test -f data/customers.csv
+          test -f data/products.csv
+          test -f data/orders.csv
+          test -f data/payments.csv
+          test -f pyspark/bronze_to_silver.py
+          test -f pyspark/data_quality_checks.py
+          test -f pyspark/silver_to_gold.py
+          test -f sql/01_create_tables.sql
+          test -f sql/02_transformations.sql
+          test -f sql/03_analytics.sql
+          test -f synapse/01_create_views.sql
+          test -f powerbi/README.md
