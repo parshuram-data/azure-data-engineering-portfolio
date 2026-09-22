@@ -33,13 +33,6 @@ This document describes the datasets used in the Azure Retail Data Platform.
 | unit_price | Price per unit at the time of the order |
 | status | Current status of the order |
 
-### Derived Order Value
-
-Order value is calculated during transformation:
-
-```text
-order_value = quantity × unit_price
-
 ### Payments
 
 | Column | Description |
@@ -50,3 +43,12 @@ order_value = quantity × unit_price
 | payment_method | Payment method used |
 | amount | Payment amount |
 | payment_status | Status of the payment |
+
+### Derived Order Value
+
+Order value is calculated during transformation:
+
+```text
+order_value = quantity × unit_price
+
+ayment |
