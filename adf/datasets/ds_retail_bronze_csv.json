@@ -1,0 +1,36 @@
+{
+  "name": "ds_retail_bronze_csv",
+  "properties": {
+    "description": "Parameterized ADLS Gen2 Bronze dataset used for raw retail data ingestion.",
+    "linkedServiceName": {
+      "referenceName": "LS_ADLS_Gen2",
+      "type": "LinkedServiceReference"
+    },
+    "parameters": {
+      "folderPath": {
+        "type": "String"
+      },
+      "fileName": {
+        "type": "String"
+      }
+    },
+    "type": "DelimitedText",
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": {
+          "value": "@dataset().folderPath",
+          "type": "Expression"
+        },
+        "fileName": {
+          "value": "@dataset().fileName",
+          "type": "Expression"
+        }
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true,
+      "quoteChar": "\"",
+      "escapeChar": "\\"
+    }
+  }
+}
