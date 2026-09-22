@@ -8,7 +8,7 @@ steps:
 
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.10'
+      versionSpec: '3.11'
 
   - script: |
       python --version
@@ -16,14 +16,51 @@ steps:
     displayName: 'Validate environment'
 
   - script: |
-      python -m compileall pyspark
+      python -m py_compile pyspark/bronze_to_silver.py
+      python -m py_compile pyspark/silver_to_gold.py
+      python -m py_compile pyspark/data_quality_checks.py
     displayName: 'Validate PySpark code'
 
   - script: |
-      echo "SQL and configuration files validated"
-      ls -la sql
-      ls -la adf
-    displayName: 'Validate project files'
+      python -m json.tool adf/pipeline_retail_data.json > /dev/null
+      echo "ADF pipeline JSON is valid"
+    displayName: 'Validate ADF pipeline JSON'
+
+  - script: |
+      test -f README.md
+      test -f adf/pipeline_retail_data.json
+      test -f adf/metadata/pipeline_config.csv
+
+      test -f data/customers.csv
+      test -f data/products.csv
+      test -f data/orders.csv
+      test -f data/payments.csv
+
+      test -f pyspark/bronze_to_silver.py
+      test -f pyspark/data_quality_checks.py
+      test -f pyspark/silver_to_gold.py
+
+      test -f sql/01_create_tables.sql
+      test -f sql/02_transformations.sql
+      test -f sql/03_analytics.sql
+
+      test -f synapse/01_create_views.sql
+      test -f powerbi/README.md
+
+      echo "Required project files are present"
+    displayName: 'Validate project structure'
+
+  - script: |
+      echo "Validating SQL files"
+      test -s sql/01_create_tables.sql
+      test -s sql/02_transformations.sql
+      test -s sql/03_analytics.sql
+
+      echo "Validating metadata configuration"
+      test -s adf/metadata/pipeline_config.csv
+
+      echo "SQL and metadata validation completed successfully"
+    displayName: 'Validate SQL and metadata'
 
   - script: |
       echo "CI validation completed successfully"
