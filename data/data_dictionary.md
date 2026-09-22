@@ -51,4 +51,4 @@ Order value is calculated during transformation:
 ```text
 order_value = quantity × unit_price
 
-ayment |
+
