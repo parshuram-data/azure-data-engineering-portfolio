@@ -8,9 +8,9 @@ This document describes the datasets used in the Azure Retail Data Platform.
 |---|---|
 | customer_id | Unique identifier for each customer |
 | customer_name | Customer name |
-| email | Customer email address |
 | city | Customer city |
 | state | Customer state |
+| signup_date | Date when the customer registered |
 
 ## Products
 
