@@ -1,0 +1,6 @@
+SourceName,SourceType,SourcePath,TargetPath,LoadType,WatermarkColumn,TargetLayer,IsActive
+customers,CSV,source/customers,bronze/customers,Incremental,last_modified,bronze,true
+orders,CSV,source/orders,bronze/orders,Incremental,updated_at,bronze,true
+products,CSV,source/products,bronze/products,Full,,bronze,true
+stores,CSV,source/stores,bronze/stores,Incremental,last_modified,bronze,true
+sales,CSV,source/sales,bronze/sales,Incremental,transaction_date,bronze,true
