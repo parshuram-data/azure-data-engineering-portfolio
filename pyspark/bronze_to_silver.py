@@ -1,24 +1,69 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, trim, upper, to_date
+import sys
 
-# Initialize Spark session
+# ---------------------------------------------------------
+# Spark Session
+# ---------------------------------------------------------
+
 spark = SparkSession.builder \
     .appName("Retail-Bronze-to-Silver") \
     .getOrCreate()
 
-# Bronze layer paths
-customers_path = "data/customers.csv"
-products_path = "data/products.csv"
-orders_path = "data/orders.csv"
-payments_path = "data/payments.csv"
+# ---------------------------------------------------------
+# Pipeline Parameters
+# ---------------------------------------------------------
+# Expected arguments:
+#   1. Bronze source path
+#   2. Silver target path
+#
+# Example:
+#   python bronze_to_silver.py <bronze_path> <silver_path>
+# ---------------------------------------------------------
 
-# Read raw data
-customers_df = spark.read.option("header", True).option("inferSchema", True).csv(customers_path)
-products_df = spark.read.option("header", True).option("inferSchema", True).csv(products_path)
-orders_df = spark.read.option("header", True).option("inferSchema", True).csv(orders_path)
-payments_df = spark.read.option("header", True).option("inferSchema", True).csv(payments_path)
+bronze_path = sys.argv[1] if len(sys.argv) > 1 else "data"
+silver_path = sys.argv[2] if len(sys.argv) > 2 else "silver"
 
-# Clean customers
+print(f"Bronze source path: {bronze_path}")
+print(f"Silver target path: {silver_path}")
+
+# ---------------------------------------------------------
+# Source Paths
+# ---------------------------------------------------------
+
+customers_path = f"{bronze_path}/customers.csv"
+products_path = f"{bronze_path}/products.csv"
+orders_path = f"{bronze_path}/orders.csv"
+payments_path = f"{bronze_path}/payments.csv"
+
+# ---------------------------------------------------------
+# Read Bronze Data
+# ---------------------------------------------------------
+
+customers_df = spark.read \
+    .option("header", True) \
+    .option("inferSchema", True) \
+    .csv(customers_path)
+
+products_df = spark.read \
+    .option("header", True) \
+    .option("inferSchema", True) \
+    .csv(products_path)
+
+orders_df = spark.read \
+    .option("header", True) \
+    .option("inferSchema", True) \
+    .csv(orders_path)
+
+payments_df = spark.read \
+    .option("header", True) \
+    .option("inferSchema", True) \
+    .csv(payments_path)
+
+# ---------------------------------------------------------
+# Customers Transformation
+# ---------------------------------------------------------
+
 customers_silver = customers_df \
     .withColumn("customer_name", trim(col("customer_name"))) \
     .withColumn("city", trim(col("city"))) \
@@ -26,20 +71,29 @@ customers_silver = customers_df \
     .withColumn("signup_date", to_date(col("signup_date"))) \
     .dropDuplicates(["customer_id"])
 
-# Clean products
+# ---------------------------------------------------------
+# Products Transformation
+# ---------------------------------------------------------
+
 products_silver = products_df \
     .withColumn("product_name", trim(col("product_name"))) \
     .withColumn("category", upper(trim(col("category")))) \
     .dropDuplicates(["product_id"])
 
-# Clean orders
+# ---------------------------------------------------------
+# Orders Transformation
+# ---------------------------------------------------------
+
 orders_silver = orders_df \
     .withColumn("order_date", to_date(col("order_date"))) \
     .withColumn("status", upper(trim(col("status")))) \
     .filter(col("quantity") > 0) \
     .dropDuplicates(["order_id"])
 
-# Clean payments
+# ---------------------------------------------------------
+# Payments Transformation
+# ---------------------------------------------------------
+
 payments_silver = payments_df \
     .withColumn("payment_date", to_date(col("payment_date"))) \
     .withColumn("payment_method", upper(trim(col("payment_method")))) \
@@ -47,11 +101,29 @@ payments_silver = payments_df \
     .filter(col("amount") >= 0) \
     .dropDuplicates(["payment_id"])
 
-# Display results
-customers_silver.show()
-products_silver.show()
-orders_silver.show()
-payments_silver.show()
+# ---------------------------------------------------------
+# Write Silver Layer
+# ---------------------------------------------------------
+
+customers_silver.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .save(f"{silver_path}/customers")
+
+products_silver.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .save(f"{silver_path}/products")
+
+orders_silver.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .save(f"{silver_path}/orders")
+
+payments_silver.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .save(f"{silver_path}/payments")
 
 print("Bronze-to-Silver transformation completed successfully.")
 
