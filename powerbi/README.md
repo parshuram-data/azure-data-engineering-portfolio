@@ -2,23 +2,33 @@
 
 This folder documents the reporting and visualization layer of the Azure Retail Data Platform.
 
-## Purpose
+Power BI consumes curated analytical data exposed through the Azure Synapse serving layer and provides business-facing dashboards and reports.
 
-Power BI consumes curated analytical data from Azure Synapse Analytics to provide business dashboards and reports.
-
-## Data Flow
+## Reporting Architecture
 
 ```text
-Azure Data Lake Gen2
-        |
-        v
-Azure Databricks
-        |
-        v
-Delta Lake Gold Layer
-        |
-        v
+Source Systems
+      |
+      v
+Azure Data Factory
+      |
+      v
+ADLS Gen2 Bronze
+      |
+      v
+Azure Databricks / PySpark
+      |
+      v
+ADLS Gen2 Silver Delta
+      |
+      v
+Data Quality Checks
+      |
+      v
+ADLS Gen2 Gold Delta
+      |
+      v
 Azure Synapse Analytics
-        |
-        v
+      |
+      v
 Power BI
