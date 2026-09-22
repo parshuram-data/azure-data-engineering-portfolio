@@ -10,7 +10,7 @@ SELECT
     quantity,
     unit_price,
     quantity * unit_price AS order_value,
-    status
+    UPPER(TRIM(status)) AS status
 FROM orders;
 
 
@@ -18,7 +18,7 @@ FROM orders;
 SELECT
     SUM(quantity * unit_price) AS total_sales
 FROM orders
-WHERE status = 'Completed';
+WHERE UPPER(TRIM(status)) = 'COMPLETED';
 
 
 -- 3. Customer-wise sales
@@ -27,7 +27,7 @@ SELECT
     SUM(quantity * unit_price) AS total_sales,
     COUNT(order_id) AS total_orders
 FROM orders
-WHERE status = 'Completed'
+WHERE UPPER(TRIM(status)) = 'COMPLETED'
 GROUP BY customer_id;
 
 
@@ -37,15 +37,16 @@ SELECT
     SUM(quantity * unit_price) AS total_sales,
     SUM(quantity) AS units_sold
 FROM orders
-WHERE status = 'Completed'
+WHERE UPPER(TRIM(status)) = 'COMPLETED'
 GROUP BY product_id;
 
 
--- 5. Join customers with orders
+-- 5. Join customers with completed orders
 SELECT
     c.customer_id,
     c.customer_name,
     c.city,
+    c.state,
     o.order_id,
     o.order_date,
     o.quantity,
@@ -54,4 +55,4 @@ SELECT
 FROM customers c
 INNER JOIN orders o
     ON c.customer_id = o.customer_id
-WHERE o.status = 'Completed';
+WHERE UPPER(TRIM(o.status)) = 'COMPLETED';
