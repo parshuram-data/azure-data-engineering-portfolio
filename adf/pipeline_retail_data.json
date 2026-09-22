@@ -1,7 +1,7 @@
 {
   "name": "PL_Retail_Data_Engineering",
   "properties": {
-    "description": "End-to-end Azure Data Factory pipeline for the Retail Data Platform using ADLS Gen2, metadata-driven ingestion and Azure Databricks.",
+    "description": "Metadata-driven Azure Data Factory pipeline for the Retail Data Platform using parameterized ADLS Gen2 datasets, Bronze ingestion, Databricks transformations, data quality validation and Gold processing.",
 
     "parameters": {
       "bronzeFolder": {
@@ -22,7 +22,7 @@
       {
         "name": "Lookup_Source_Metadata",
         "type": "Lookup",
-        "description": "Reads source dataset metadata from the pipeline configuration file for metadata-driven processing.",
+        "description": "Reads all source configuration records from the metadata control file.",
         "typeProperties": {
           "source": {
             "type": "DelimitedTextSource",
@@ -35,9 +35,9 @@
       },
 
       {
-        "name": "ForEach_Source_Table",
-        "type": "ForEach",
-        "description": "Iterates through source datasets defined in the metadata configuration.",
+        "name": "Filter_Active_Sources",
+        "type": "Filter",
+        "description": "Processes only metadata records where IsActive is true.",
         "dependsOn": [
           {
             "activity": "Lookup_Source_Metadata",
@@ -51,22 +51,89 @@
             "value": "@activity('Lookup_Source_Metadata').output.value",
             "type": "Expression"
           },
+          "condition": {
+            "value": "@equals(toLower(string(item().IsActive)), 'true')",
+            "type": "Expression"
+          }
+        }
+      },
+
+      {
+        "name": "ForEach_Source_Table",
+        "type": "ForEach",
+        "description": "Iterates through active source configurations and dynamically copies each source into the Bronze layer.",
+        "dependsOn": [
+          {
+            "activity": "Filter_Active_Sources",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('Filter_Active_Sources').output.value",
+            "type": "Expression"
+          },
+          "isSequential": false,
+          "batchCount": 4,
           "activities": [
             {
               "name": "Copy_To_Bronze",
               "type": "Copy",
-              "description": "Copies raw source data into the ADLS Gen2 Bronze layer.",
+              "description": "Copies the source CSV defined by metadata into its configured Bronze target path.",
+              "inputs": [
+                {
+                  "referenceName": "ds_retail_source_csv",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "filePath": {
+                      "value": "@substring(item().SourcePath, 0, lastIndexOf(item().SourcePath, '/'))",
+                      "type": "Expression"
+                    },
+                    "fileName": {
+                      "value": "@substring(item().SourcePath, add(lastIndexOf(item().SourcePath, '/'), 1), sub(length(item().SourcePath), add(lastIndexOf(item().SourcePath, '/'), 1)))",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
+              "outputs": [
+                {
+                  "referenceName": "ds_retail_bronze_csv",
+                  "type": "DatasetReference",
+                  "parameters": {
+                    "folderPath": {
+                      "value": "@concat(pipeline().parameters.bronzeFolder, '/', item().TargetPath)",
+                      "type": "Expression"
+                    },
+                    "fileName": {
+                      "value": "@concat(item().SourceName, '.csv')",
+                      "type": "Expression"
+                    }
+                  }
+                }
+              ],
               "typeProperties": {
                 "source": {
                   "type": "DelimitedTextSource",
                   "storeSettings": {
-                    "type": "AzureBlobFSReadSettings"
+                    "type": "AzureBlobFSReadSettings",
+                    "recursive": false
+                  },
+                  "formatSettings": {
+                    "type": "DelimitedTextReadSettings"
                   }
                 },
                 "sink": {
                   "type": "DelimitedTextSink",
                   "storeSettings": {
-                    "type": "AzureBlobFSWriteSettings"
+                    "type": "AzureBlobFSWriteSettings",
+                    "copyBehavior": "PreserveHierarchy"
+                  },
+                  "formatSettings": {
+                    "type": "DelimitedTextWriteSettings",
+                    "quoteAllText": false
                   }
                 }
               }
@@ -78,7 +145,7 @@
       {
         "name": "Bronze_To_Silver_Databricks",
         "type": "DatabricksNotebook",
-        "description": "Runs PySpark transformations to clean, standardize and deduplicate Bronze datasets before writing Delta tables to the Silver layer.",
+        "description": "Runs PySpark transformations to clean, standardize and deduplicate Bronze datasets before writing Delta tables to Silver.",
         "dependsOn": [
           {
             "activity": "ForEach_Source_Table",
@@ -99,7 +166,7 @@
       {
         "name": "Data_Quality_Checks",
         "type": "DatabricksNotebook",
-        "description": "Validates null values, duplicate records and required data quality rules on the Silver layer.",
+        "description": "Validates required fields, duplicates and business data quality rules on Silver datasets.",
         "dependsOn": [
           {
             "activity": "Bronze_To_Silver_Databricks",
@@ -140,7 +207,7 @@
       {
         "name": "Pipeline_Failure_Handling",
         "type": "WebActivity",
-        "description": "Placeholder for failure notification through email, Microsoft Teams or Azure Logic Apps.",
+        "description": "Placeholder for production failure notification integration such as Azure Logic Apps, Teams or email.",
         "dependsOn": [
           {
             "activity": "Silver_To_Gold_Databricks",
