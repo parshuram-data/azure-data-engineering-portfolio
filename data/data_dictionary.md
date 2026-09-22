@@ -10,7 +10,7 @@ This document describes the datasets used in the Azure Retail Data Platform.
 | customer_name | Customer name |
 | email | Customer email address |
 | city | Customer city |
-| country | Customer country |
+| state | Customer state |
 
 ## Products
 
@@ -30,15 +30,12 @@ This document describes the datasets used in the Azure Retail Data Platform.
 | product_id | Product included in the order |
 | order_date | Date when the order was placed |
 | quantity | Quantity ordered |
-| order_amount | Total order amount |
+| unit_price | Price per unit at the time of the order |
+| status | Current status of the order |
 
-## Payments
+### Derived Order Value
 
-| Column | Description |
-|---|---|
-| payment_id | Unique identifier for each payment |
-| order_id | Related order identifier |
-| payment_date | Date of payment |
-| payment_method | Payment method used |
-| payment_status | Status of the payment |
-| amount | Payment amount |
+Order value is calculated during transformation:
+
+```text
+order_value = quantity × unit_price
