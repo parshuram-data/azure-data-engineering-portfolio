@@ -10,19 +10,19 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # ---------------------------------------------------------
-# ADF / Databricks Parameters
+# Pipeline Parameters
 # ---------------------------------------------------------
-# ADF passes:
-#   source_path = pipeline().parameters.silverFolder
-#   target_path = pipeline().parameters.goldFolder
+# Azure Data Factory passes:
+#   source_path = Silver layer path
+#   target_path = Gold layer path
 #
 # Example:
-#   source_path = /mnt/retail/silver
-#   target_path = /mnt/retail/gold
+#   source_path = silver
+#   target_path = gold
 # ---------------------------------------------------------
 
-dbutils.widgets.text("source_path", "data/silver")
-dbutils.widgets.text("target_path", "data/gold")
+dbutils.widgets.text("source_path", "silver")
+dbutils.widgets.text("target_path", "gold")
 
 source_path = dbutils.widgets.get("source_path")
 target_path = dbutils.widgets.get("target_path")
@@ -49,7 +49,11 @@ orders = spark.read \
 # ---------------------------------------------------------
 # Filter Completed Orders
 # ---------------------------------------------------------
-# bronze_to_silver standardizes status to uppercase.
+# Bronze-to-Silver standardizes order status to uppercase.
+#
+# Only COMPLETED orders are included in sales calculations.
+# CANCELLED orders are excluded from revenue reporting.
+# ---------------------------------------------------------
 
 completed_orders = orders.filter(
     col("status") == "COMPLETED"
@@ -57,6 +61,8 @@ completed_orders = orders.filter(
 
 # ---------------------------------------------------------
 # Calculate Order-Level Revenue
+# ---------------------------------------------------------
+# Order value = quantity × unit price
 # ---------------------------------------------------------
 
 order_revenue = completed_orders.withColumn(
@@ -129,12 +135,24 @@ gold_product_sales.write \
 # Validation / Output
 # ---------------------------------------------------------
 
-print("Customer Sales:")
-gold_customer_sales.show()
+print("\n===== GOLD DATASET VALIDATION =====")
 
-print("Product Sales:")
-gold_product_sales.show()
+customer_sales_count = gold_customer_sales.count()
+product_sales_count = gold_product_sales.count()
 
-print("Silver-to-Gold transformation completed successfully.")
+print(f"Customer Sales records: {customer_sales_count}")
+print(f"Product Sales records: {product_sales_count}")
+
+print("\nCustomer Sales:")
+gold_customer_sales.show(truncate=False)
+
+print("\nProduct Sales:")
+gold_product_sales.show(truncate=False)
+
+print("\nSilver-to-Gold transformation completed successfully.")
+
+# ---------------------------------------------------------
+# Stop Spark Session
+# ---------------------------------------------------------
 
 spark.stop()
