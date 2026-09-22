@@ -1,0 +1,56 @@
+{
+  "name": "ds_pipeline_config_csv",
+  "properties": {
+    "description": "Centralized metadata configuration dataset used by the metadata-driven retail ingestion pipeline.",
+    "linkedServiceName": {
+      "referenceName": "LS_ADLS_Gen2",
+      "type": "LinkedServiceReference"
+    },
+    "type": "DelimitedText",
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": "adf/metadata",
+        "fileName": "pipeline_config.csv"
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true,
+      "quoteChar": "\"",
+      "escapeChar": "\\"
+    },
+    "schema": [
+      {
+        "name": "SourceName",
+        "type": "String"
+      },
+      {
+        "name": "SourceType",
+        "type": "String"
+      },
+      {
+        "name": "SourcePath",
+        "type": "String"
+      },
+      {
+        "name": "TargetPath",
+        "type": "String"
+      },
+      {
+        "name": "LoadType",
+        "type": "String"
+      },
+      {
+        "name": "WatermarkColumn",
+        "type": "String"
+      },
+      {
+        "name": "TargetLayer",
+        "type": "String"
+      },
+      {
+        "name": "IsActive",
+        "type": "String"
+      }
+    ]
+  }
+}
