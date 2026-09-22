@@ -1,6 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, trim, upper, to_date
-import sys
+from pyspark.sql.types import IntegerType, DoubleType
 
 # ---------------------------------------------------------
 # Spark Session
@@ -13,16 +13,22 @@ spark = SparkSession.builder \
 # ---------------------------------------------------------
 # Pipeline Parameters
 # ---------------------------------------------------------
-# Expected arguments:
-#   1. Bronze source path
-#   2. Silver target path
+# These parameters are passed from Azure Data Factory
+# through the Databricks activity.
+#
+# source_path = Bronze source location
+# target_path = Silver target location
 #
 # Example:
-#   python bronze_to_silver.py <bronze_path> <silver_path>
+# source_path = data
+# target_path = silver
 # ---------------------------------------------------------
 
-bronze_path = sys.argv[1] if len(sys.argv) > 1 else "data"
-silver_path = sys.argv[2] if len(sys.argv) > 2 else "silver"
+dbutils.widgets.text("source_path", "data")
+dbutils.widgets.text("target_path", "silver")
+
+bronze_path = dbutils.widgets.get("source_path")
+silver_path = dbutils.widgets.get("target_path")
 
 print(f"Bronze source path: {bronze_path}")
 print(f"Silver target path: {silver_path}")
@@ -78,6 +84,8 @@ customers_silver = customers_df \
 products_silver = products_df \
     .withColumn("product_name", trim(col("product_name"))) \
     .withColumn("category", upper(trim(col("category")))) \
+    .withColumn("price", col("price").cast(DoubleType())) \
+    .filter(col("price") >= 0) \
     .dropDuplicates(["product_id"])
 
 # ---------------------------------------------------------
@@ -87,7 +95,10 @@ products_silver = products_df \
 orders_silver = orders_df \
     .withColumn("order_date", to_date(col("order_date"))) \
     .withColumn("status", upper(trim(col("status")))) \
+    .withColumn("quantity", col("quantity").cast(IntegerType())) \
+    .withColumn("unit_price", col("unit_price").cast(DoubleType())) \
     .filter(col("quantity") > 0) \
+    .filter(col("unit_price") >= 0) \
     .dropDuplicates(["order_id"])
 
 # ---------------------------------------------------------
@@ -98,6 +109,7 @@ payments_silver = payments_df \
     .withColumn("payment_date", to_date(col("payment_date"))) \
     .withColumn("payment_method", upper(trim(col("payment_method")))) \
     .withColumn("payment_status", upper(trim(col("payment_status")))) \
+    .withColumn("amount", col("amount").cast(DoubleType())) \
     .filter(col("amount") >= 0) \
     .dropDuplicates(["payment_id"])
 
@@ -124,6 +136,10 @@ payments_silver.write \
     .format("delta") \
     .mode("overwrite") \
     .save(f"{silver_path}/payments")
+
+# ---------------------------------------------------------
+# Completion Message
+# ---------------------------------------------------------
 
 print("Bronze-to-Silver transformation completed successfully.")
 
