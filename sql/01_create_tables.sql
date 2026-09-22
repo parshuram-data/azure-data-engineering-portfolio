@@ -4,7 +4,6 @@
 CREATE TABLE customers (
     customer_id VARCHAR(20),
     customer_name VARCHAR(100),
-    email VARCHAR(150),
     city VARCHAR(100),
     state VARCHAR(100),
     signup_date DATE
