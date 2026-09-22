@@ -1,0 +1,1 @@
+RunId,PipelineName,SourceName,LoadType,StartTime,EndTime,Status,SourceRecordCount,BronzeRecordCount,SilverRecordCount,RejectedRecordCount,WatermarkStart,WatermarkEnd,ErrorMessage
