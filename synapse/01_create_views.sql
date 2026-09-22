@@ -1,34 +1,64 @@
 -- Azure Synapse Analytics
--- Analytical views for the Azure Retail Data Platform
+-- Analytical serving views for the Azure Retail Data Platform
+--
+-- These views represent the serving layer over the curated
+-- Gold datasets produced by the PySpark transformation pipeline.
 
--- Customer sales summary
+
+-- =========================================================
+-- Customer Sales View
+-- =========================================================
+
 CREATE VIEW vw_customer_sales
 AS
 SELECT
     customer_id,
-    COUNT(order_id) AS total_orders,
-    SUM(order_amount) AS total_sales
-FROM fact_orders
-GROUP BY customer_id;
+    customer_name,
+    city,
+    state,
+    total_orders,
+    total_sales
+FROM gold_customer_sales;
 
 
--- Product sales summary
+-- =========================================================
+-- Product Sales View
+-- =========================================================
+
 CREATE VIEW vw_product_sales
 AS
 SELECT
     product_id,
-    SUM(quantity) AS total_quantity,
-    SUM(order_amount) AS total_sales
-FROM fact_orders
-GROUP BY product_id;
+    product_name,
+    category,
+    units_sold,
+    revenue
+FROM gold_product_sales;
 
 
--- Daily sales summary
-CREATE VIEW vw_daily_sales
+-- =========================================================
+-- Customer Sales by State
+-- =========================================================
+
+CREATE VIEW vw_sales_by_state
 AS
 SELECT
-    order_date,
-    COUNT(order_id) AS total_orders,
-    SUM(order_amount) AS total_sales
-FROM fact_orders
-GROUP BY order_date;
+    state,
+    SUM(total_orders) AS total_orders,
+    SUM(total_sales) AS total_sales
+FROM gold_customer_sales
+GROUP BY state;
+
+
+-- =========================================================
+-- Product Category Sales
+-- =========================================================
+
+CREATE VIEW vw_sales_by_category
+AS
+SELECT
+    category,
+    SUM(units_sold) AS units_sold,
+    SUM(revenue) AS total_revenue
+FROM gold_product_sales
+GROUP BY category;
