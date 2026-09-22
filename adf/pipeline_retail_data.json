@@ -1,13 +1,9 @@
 {
   "name": "PL_Retail_Data_Engineering",
   "properties": {
-    "description": "End-to-end Azure Data Factory pipeline for the Retail Data Platform using ADLS Gen2 and Azure Databricks.",
+    "description": "End-to-end Azure Data Factory pipeline for the Retail Data Platform using ADLS Gen2, metadata-driven ingestion and Azure Databricks.",
 
     "parameters": {
-      "sourceFolder": {
-        "type": "String",
-        "defaultValue": "source"
-      },
       "bronzeFolder": {
         "type": "String",
         "defaultValue": "bronze"
@@ -26,7 +22,7 @@
       {
         "name": "Lookup_Source_Metadata",
         "type": "Lookup",
-        "description": "Reads source table and file metadata for metadata-driven processing.",
+        "description": "Reads source dataset metadata from the pipeline configuration file for metadata-driven processing.",
         "typeProperties": {
           "source": {
             "type": "DelimitedTextSource",
@@ -41,7 +37,7 @@
       {
         "name": "ForEach_Source_Table",
         "type": "ForEach",
-        "description": "Processes multiple source datasets dynamically.",
+        "description": "Iterates through source datasets defined in the metadata configuration.",
         "dependsOn": [
           {
             "activity": "Lookup_Source_Metadata",
@@ -82,7 +78,7 @@
       {
         "name": "Bronze_To_Silver_Databricks",
         "type": "DatabricksNotebook",
-        "description": "Runs PySpark transformations to clean, deduplicate and standardize Bronze data.",
+        "description": "Runs PySpark transformations to clean, standardize and deduplicate Bronze datasets before writing Delta tables to the Silver layer.",
         "dependsOn": [
           {
             "activity": "ForEach_Source_Table",
@@ -103,7 +99,7 @@
       {
         "name": "Data_Quality_Checks",
         "type": "DatabricksNotebook",
-        "description": "Validates null values, duplicate records, required columns and data quality rules.",
+        "description": "Validates null values, duplicate records and required data quality rules on the Silver layer.",
         "dependsOn": [
           {
             "activity": "Bronze_To_Silver_Databricks",
@@ -144,7 +140,7 @@
       {
         "name": "Pipeline_Failure_Handling",
         "type": "WebActivity",
-        "description": "Placeholder for failure notification such as email, Teams or Logic Apps.",
+        "description": "Placeholder for failure notification through email, Microsoft Teams or Azure Logic Apps.",
         "dependsOn": [
           {
             "activity": "Silver_To_Gold_Databricks",
