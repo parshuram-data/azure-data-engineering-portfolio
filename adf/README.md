@@ -1,108 +1,208 @@
+
 # Azure Data Factory Pipeline
 
 This folder contains the Azure Data Factory orchestration design for the Azure Retail Data Platform.
 
 ## Pipeline Overview
 
-Azure Data Factory is used to orchestrate the end-to-end data engineering workflow.
+Azure Data Factory orchestrates the end-to-end data engineering workflow.
 
 ### Data Flow
 
 Source Systems
 → Azure Data Factory
-→ ADLS Gen2 Bronze Layer
-→ Databricks PySpark Transformation
-→ Silver Layer
-→ Gold Layer
+→ ADLS Gen2 Bronze
+→ Databricks / PySpark
+→ ADLS Gen2 Silver
+→ Data Quality Checks
+→ ADLS Gen2 Gold
 → Azure Synapse Analytics
 → Power BI
 
-## Source Data
+## Pipeline Definition
 
-The solution uses sample retail datasets:
+Main pipeline:
 
-- customers.csv
-- products.csv
-- orders.csv
-- payments.csv
+`PL_Retail_Data_Engineering`
+
+Definition: [`pipeline_retail_data.json`](./pipeline_retail_data.json)
+
+Parameters:
+
+- `sourceFolder`
+- `bronzeFolder`
+- `silverFolder`
+- `goldFolder`
+
+These parameters allow reusable storage paths across environments.
+
+## Metadata-Driven Processing
+
+Metadata configuration:
+
+[`metadata/pipeline_config.csv`](./metadata/pipeline_config.csv)
+
+The metadata contains:
+
+- Source name
+- Source type
+- Source path
+- Target path
+- Load type
+- Watermark column
+- Target layer
+- Active flag
+
+### Processing Pattern
+
+pipeline_config.csv
+→ Lookup_Source_Metadata
+→ ForEach_Source_Table
+→ Dynamic source processing
+→ Copy_To_Bronze
+
+This approach avoids hard-coding individual source datasets and makes it easier to add new sources.
 
 ## ADF Pipeline Activities
 
-The pipeline performs the following activities:
+### 1. Lookup Source Metadata
 
-1. **Lookup Activity**
-   - Reads table and file metadata.
-   - Determines which datasets need to be processed.
+`Lookup_Source_Metadata`
 
-2. **ForEach Activity**
-   - Iterates through multiple source datasets.
-   - Enables reusable and metadata-driven processing.
+- Reads source metadata.
+- Determines datasets to process.
+- Passes the metadata collection to the ForEach activity.
 
-3. **Copy Activity**
-   - Copies source data into the ADLS Gen2 Bronze layer.
-   - Preserves the raw source data.
+### 2. ForEach Source Table
 
-4. **Databricks Activity**
-   - Executes PySpark transformations.
-   - Performs cleansing, deduplication and business transformations.
+`ForEach_Source_Table`
 
-5. **Data Quality Checks**
-   - Validates null values.
-   - Checks duplicate records.
-   - Validates required columns and data types.
+- Iterates through multiple datasets.
+- Enables reusable, metadata-driven processing.
 
-6. **Gold Layer Processing**
-   - Creates analytics-ready datasets.
-   - Organizes data for reporting and business analysis.
+### 3. Copy to Bronze
 
-7. **Error Handling**
-   - Pipeline activities include retry and failure handling.
-   - Failed activities are logged for troubleshooting.
+`Copy_To_Bronze`
+
+- Copies raw source data into ADLS Gen2 Bronze.
+- Preserves the raw source data.
+
+### 4. Bronze to Silver
+
+`Bronze_To_Silver_Databricks`
+
+- Invokes a Databricks notebook.
+- Performs PySpark cleansing, deduplication and business transformations.
+
+### 5. Data Quality Checks
+
+`Data_Quality_Checks`
+
+Validates:
+
+- Null values
+- Duplicate records
+- Required columns
+- Expected data types
+- Data quality rules
+
+### 6. Silver to Gold
+
+`Silver_To_Gold_Databricks`
+
+Creates analytics-ready Gold datasets for reporting and business analysis.
+
+### 7. Pipeline Failure Handling
+
+`Pipeline_Failure_Handling`
+
+Provides a failure-notification integration pattern that can be connected to:
+
+- Azure Logic Apps
+- Microsoft Teams
+- Email
+- Azure Monitor
+
+No production credentials or connection details are stored in the repository.
 
 ## Incremental Loading
 
-Incremental loading can be implemented using a watermark column such as:
+Incremental loading can use watermark columns such as:
 
-- last_modified_date
-- created_date
-- updated_timestamp
+- `last_modified`
+- `last_modified_date`
+- `created_date`
+- `updated_timestamp`
 
 Only new or modified records are processed during incremental runs.
 
-## Monitoring
+See [`incremental_load.md`](./incremental_load.md).
 
-Azure Data Factory Monitor is used to track:
+## Medallion Architecture
 
-- Pipeline execution status
+### Bronze
+Raw source data with minimal transformation.
+
+### Silver
+Cleaned, standardized and validated data.
+
+### Gold
+Business-ready datasets optimized for analytics and reporting.
+
+## Monitoring and Error Handling
+
+Azure Data Factory Monitor can track:
+
+- Pipeline status
 - Activity status
 - Execution duration
 - Errors and failures
 - Retry attempts
 
-Alerts can be configured for pipeline failures.
+Typical troubleshooting flow:
 
-## Architecture
+ADF Monitor
+→ Identify Failed Activity
+→ Review Error
+→ Check Databricks Logs
+→ Validate Source/Target
+→ Correct and Rerun
 
-The solution follows a Medallion Architecture:
+## Source Data
 
-### Bronze
+Sample retail datasets include:
 
-Raw data copied from source systems.
+- `customers.csv`
+- `products.csv`
+- `orders.csv`
+- `payments.csv`
 
-### Silver
+Additional datasets can be incorporated through the metadata-driven configuration.
 
-Cleaned and transformed data.
+## Repository Files
 
-### Gold
+```text
+adf/
+├── README.md
+├── incremental_load.md
+├── pipeline_retail_data.json
+└── metadata/
+    └── pipeline_config.csv
+````
 
-Business-ready data optimized for analytics and reporting.
+| File                           | Purpose                                          |
+| ------------------------------ | ------------------------------------------------ |
+| `README.md`                    | ADF architecture and orchestration documentation |
+| `pipeline_retail_data.json`    | Representative ADF pipeline definition           |
+| `incremental_load.md`          | Incremental loading strategy                     |
+| `metadata/pipeline_config.csv` | Metadata configuration                           |
 
 ## Technologies
 
-- Azure Data Factory
-- Azure Data Lake Storage Gen2
-- Azure Databricks
-- PySpark
-- Delta Lake
-- Azure Synapse Analytics
-- Power BI
+* Azure Data Factory
+* Azure Data Lake Storage Gen2
+* Azure Databricks
+* PySpark
+* Delta Lake
+* Azure Synapse Analytics
+* Power BI
