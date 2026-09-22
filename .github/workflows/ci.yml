@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # ---------------------------------------------------
       # Checkout Repository
       # ---------------------------------------------------
@@ -49,12 +50,13 @@ jobs:
           python -m py_compile pyspark/data_quality_checks.py
 
       # ---------------------------------------------------
-      # Validate JSON Files
+      # Validate ADF JSON
       # ---------------------------------------------------
 
       - name: Validate JSON files
         run: |
           python -m json.tool adf/pipeline_retail_data.json > /dev/null
+          echo "ADF pipeline JSON is valid"
 
       # ---------------------------------------------------
       # Validate Required Project Files
@@ -63,17 +65,52 @@ jobs:
       - name: Validate project structure
         run: |
           test -f README.md
+
           test -f adf/pipeline_retail_data.json
           test -f adf/metadata/pipeline_config.csv
+          test -f adf/README.md
+          test -f adf/incremental_load.md
+
           test -f data/customers.csv
           test -f data/products.csv
           test -f data/orders.csv
           test -f data/payments.csv
+          test -f data/data_dictionary.md
+
           test -f pyspark/bronze_to_silver.py
           test -f pyspark/data_quality_checks.py
           test -f pyspark/silver_to_gold.py
+
           test -f sql/01_create_tables.sql
           test -f sql/02_transformations.sql
           test -f sql/03_analytics.sql
+
           test -f synapse/01_create_views.sql
+          test -f synapse/README.md
+
           test -f powerbi/README.md
+
+          test -f devops/azure-pipelines.yml
+
+          echo "Required project files are present"
+
+      # ---------------------------------------------------
+      # Validate SQL and Metadata
+      # ---------------------------------------------------
+
+      - name: Validate SQL and metadata
+        run: |
+          test -s sql/01_create_tables.sql
+          test -s sql/02_transformations.sql
+          test -s sql/03_analytics.sql
+          test -s adf/metadata/pipeline_config.csv
+
+          echo "SQL and metadata validation completed successfully"
+
+      # ---------------------------------------------------
+      # Pipeline Completed
+      # ---------------------------------------------------
+
+      - name: Pipeline completed
+        run: |
+          echo "Azure Data Engineering CI validation completed successfully"
