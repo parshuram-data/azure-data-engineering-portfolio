@@ -1,208 +1,384 @@
 
-# Azure Data Factory Pipeline
+# Azure Data Factory
 
-This folder contains the Azure Data Factory orchestration design for the Azure Retail Data Platform.
+## Overview
 
-## Pipeline Overview
+Azure Data Factory is used as the orchestration layer for the Azure Data
+Engineering platform.
 
-Azure Data Factory orchestrates the end-to-end data engineering workflow.
+The repository demonstrates a metadata-driven orchestration pattern that
+coordinates ingestion, Databricks transformations, data-quality validation
+and Gold-layer processing.
 
-### Data Flow
+---
 
-Source Systems
-→ Azure Data Factory
-→ ADLS Gen2 Bronze
-→ Databricks / PySpark
-→ ADLS Gen2 Silver
-→ Data Quality Checks
-→ ADLS Gen2 Gold
-→ Azure Synapse Analytics
-→ Power BI
+## Pipeline Flow
 
-## Pipeline Definition
+```text
+Source CSV Files
+       │
+       ▼
+Lookup_Source_Metadata
+       │
+       ▼
+ForEach_Source_Table
+       │
+       ▼
+Copy_To_Bronze
+       │
+       ▼
+Bronze_To_Silver_Databricks
+       │
+       ▼
+Data_Quality_Checks
+       │
+       ▼
+Silver_To_Gold_Databricks
+       │
+       ▼
+Analytics / Serving Layer
+````
 
-Main pipeline:
+---
 
-`PL_Retail_Data_Engineering`
+## Pipeline
 
-Definition: [`pipeline_retail_data.json`](./pipeline_retail_data.json)
+Pipeline name:
 
-Parameters:
+```text
+PL_Retail_Data_Engineering
+```
 
-- `sourceFolder`
-- `bronzeFolder`
-- `silverFolder`
-- `goldFolder`
+The pipeline is represented in:
 
-These parameters allow reusable storage paths across environments.
+```text
+adf/pipeline_retail_data.json
+```
 
-## Metadata-Driven Processing
+---
 
-Metadata configuration:
+## Pipeline Parameters
 
-[`metadata/pipeline_config.csv`](./metadata/pipeline_config.csv)
+The current pipeline defines the following parameters:
+
+| Parameter      | Purpose               | Default  |
+| -------------- | --------------------- | -------- |
+| `bronzeFolder` | Bronze layer location | `bronze` |
+| `silverFolder` | Silver layer location | `silver` |
+| `goldFolder`   | Gold layer location   | `gold`   |
+
+These parameters are passed to Databricks notebooks so that the
+transformation layer is not tied to a single hard-coded environment path.
+
+---
+
+## Metadata-Driven Design
+
+Source configuration is maintained in:
+
+```text
+adf/metadata/pipeline_config.csv
+```
 
 The metadata contains:
 
-- Source name
-- Source type
-- Source path
-- Target path
-- Load type
-- Watermark column
-- Target layer
-- Active flag
+| Column            | Purpose                                    |
+| ----------------- | ------------------------------------------ |
+| `SourceName`      | Logical source dataset name                |
+| `SourceType`      | Source format                              |
+| `SourcePath`      | Source location                            |
+| `TargetPath`      | Bronze target location                     |
+| `LoadType`        | Full or incremental loading pattern        |
+| `WatermarkColumn` | Column intended for incremental processing |
+| `TargetLayer`     | Target Medallion layer                     |
+| `IsActive`        | Indicates whether the source is active     |
 
-### Processing Pattern
+Example configuration:
 
-pipeline_config.csv
-→ Lookup_Source_Metadata
-→ ForEach_Source_Table
-→ Dynamic source processing
-→ Copy_To_Bronze
+```text
+customers → Incremental → signup_date
+orders    → Incremental → order_date
+products  → Full
+payments  → Incremental → payment_date
+```
 
-This approach avoids hard-coding individual source datasets and makes it easier to add new sources.
+The configuration provides a reusable metadata structure for source
+orchestration.
 
-## ADF Pipeline Activities
+---
 
-### 1. Lookup Source Metadata
+## Bronze Ingestion
 
-`Lookup_Source_Metadata`
+The ingestion stage is represented by:
 
-- Reads source metadata.
-- Determines datasets to process.
-- Passes the metadata collection to the ForEach activity.
+```text
+Lookup_Source_Metadata
+        ↓
+ForEach_Source_Table
+        ↓
+Copy_To_Bronze
+```
 
-### 2. ForEach Source Table
+The Bronze layer is intended to preserve source data before business
+transformations are applied.
 
-`ForEach_Source_Table`
+Expected Bronze datasets:
 
-- Iterates through multiple datasets.
-- Enables reusable, metadata-driven processing.
+```text
+bronze/
+├── customers/
+├── products/
+├── orders/
+└── payments/
+```
 
-### 3. Copy to Bronze
+---
 
-`Copy_To_Bronze`
+## Databricks Integration
 
-- Copies raw source data into ADLS Gen2 Bronze.
-- Preserves the raw source data.
+After Bronze ingestion, Azure Data Factory invokes Databricks notebooks.
 
-### 4. Bronze to Silver
+### Bronze → Silver
 
-`Bronze_To_Silver_Databricks`
+```text
+Bronze_To_Silver_Databricks
+```
 
-- Invokes a Databricks notebook.
-- Performs PySpark cleansing, deduplication and business transformations.
+Notebook:
 
-### 5. Data Quality Checks
+```text
+/Shared/azure-data-engineering-portfolio/bronze_to_silver
+```
 
-`Data_Quality_Checks`
+The notebook performs:
 
-Validates:
+* Data type conversion
+* String trimming
+* Status standardization
+* Category standardization
+* Basic validation
+* Deduplication
+* Delta Lake writes
 
-- Null values
-- Duplicate records
-- Required columns
-- Expected data types
-- Data quality rules
+---
 
-### 6. Silver to Gold
+## Data Quality
 
-`Silver_To_Gold_Databricks`
+The pipeline then invokes:
 
-Creates analytics-ready Gold datasets for reporting and business analysis.
+```text
+Data_Quality_Checks
+```
 
-### 7. Pipeline Failure Handling
+Notebook:
 
-`Pipeline_Failure_Handling`
+```text
+/Shared/azure-data-engineering-portfolio/data_quality_checks
+```
 
-Provides a failure-notification integration pattern that can be connected to:
+The validation layer checks:
 
-- Azure Logic Apps
-- Microsoft Teams
-- Email
-- Azure Monitor
+* Duplicate identifiers
+* NULL identifiers
+* NULL required attributes
+* Invalid quantities
+* Invalid prices
+* Invalid payment amounts
 
-No production credentials or connection details are stored in the repository.
+The quality process returns a passed or failed status based on the
+configured checks.
+
+---
+
+## Silver → Gold
+
+After successful data-quality validation:
+
+```text
+Silver_To_Gold_Databricks
+```
+
+Notebook:
+
+```text
+/Shared/azure-data-engineering-portfolio/silver_to_gold
+```
+
+The transformation creates the analytics-ready Gold datasets:
+
+```text
+gold/
+├── customer_sales/
+└── product_sales/
+```
+
+Sales calculations use:
+
+```text
+order_value = quantity × unit_price
+```
+
+Only completed orders are included in sales calculations.
+
+---
+
+## Failure Handling
+
+The pipeline includes:
+
+```text
+Pipeline_Failure_Handling
+```
+
+This activity represents a failure-notification integration.
+
+The current JSON uses a placeholder endpoint:
+
+```text
+https://example.com/ADF-Failure-Notification
+```
+
+This is intentionally documented as a placeholder and is **not a live
+production notification integration**.
+
+In a production Azure environment this could be connected to services such
+as:
+
+* Azure Logic Apps
+* Microsoft Teams
+* Email notification workflows
+* Azure Monitor / alerting
+
+---
 
 ## Incremental Loading
 
-Incremental loading can use watermark columns such as:
+The metadata configuration contains:
 
-- `last_modified`
-- `last_modified_date`
-- `created_date`
-- `updated_timestamp`
+```text
+LoadType
+WatermarkColumn
+```
 
-Only new or modified records are processed during incremental runs.
+These fields support an incremental-loading design.
 
-See [`incremental_load.md`](./incremental_load.md).
+For example:
+
+```text
+orders → order_date
+payments → payment_date
+customers → signup_date
+```
+
+The current repository documents the pattern but does not implement a
+persistent watermark store or complete dynamic watermark filtering.
+
+A production implementation could use:
+
+```text
+Source
+  ↓
+Read Last Watermark
+  ↓
+Filter New / Changed Records
+  ↓
+Copy to Bronze
+  ↓
+Process Silver
+  ↓
+Update Watermark
+```
+
+This distinction keeps the portfolio accurate about implemented versus
+production-ready functionality.
+
+---
 
 ## Medallion Architecture
 
-### Bronze
-Raw source data with minimal transformation.
+The ADF orchestration follows the Medallion Architecture:
 
-### Silver
-Cleaned, standardized and validated data.
+```text
+             ┌──────────────┐
+             │    Bronze    │
+             │ Raw ingestion│
+             └──────┬───────┘
+                    │
+                    ▼
+             ┌──────────────┐
+             │    Silver    │
+             │ Curated data │
+             └──────┬───────┘
+                    │
+                    ▼
+             ┌──────────────┐
+             │     Gold     │
+             │  Analytics   │
+             └──────────────┘
+```
 
-### Gold
-Business-ready datasets optimized for analytics and reporting.
+---
 
 ## Monitoring and Error Handling
 
-Azure Data Factory Monitor can track:
+In a deployed Azure environment, pipeline monitoring can be performed
+through Azure Data Factory monitoring.
 
-- Pipeline status
-- Activity status
-- Execution duration
-- Errors and failures
-- Retry attempts
+Typical operational checks include:
 
-Typical troubleshooting flow:
+1. Pipeline run status
+2. Activity failure details
+3. Databricks notebook execution logs
+4. Data-quality results
+5. Target dataset availability
+6. Downstream reporting impact
 
-ADF Monitor
-→ Identify Failed Activity
-→ Review Error
-→ Check Databricks Logs
-→ Validate Source/Target
-→ Correct and Rerun
+The repository provides the pipeline structure and validation logic rather
+than a live Azure monitoring configuration.
 
-## Source Data
-
-Sample retail datasets include:
-
-- `customers.csv`
-- `products.csv`
-- `orders.csv`
-- `payments.csv`
-
-Additional datasets can be incorporated through the metadata-driven configuration.
+---
 
 ## Repository Files
 
 ```text
 adf/
-├── README.md
-├── incremental_load.md
+├── metadata/
+│   └── pipeline_config.csv
 ├── pipeline_retail_data.json
-└── metadata/
-    └── pipeline_config.csv
+├── README.md
+└── incremental_load.md
+```
+
+---
+
+## Key Concepts Demonstrated
+
+* Azure Data Factory orchestration
+* Metadata-driven pipeline design
+* Medallion Architecture
+* Parameterized Databricks notebooks
+* Bronze → Silver → Gold processing
+* Data-quality validation
+* Failure-handling patterns
+* Incremental-loading design
+* Delta Lake integration
+* CI/CD validation
+
+---
+
+## Important Implementation Note
+
+The JSON file in this repository is a portfolio representation of the ADF
+pipeline orchestration.
+
+A production deployment would additionally require environment-specific:
+
+* Linked services
+* Datasets
+* Storage credentials / managed identities
+* Dynamic source and sink expressions
+* Databricks linked services
+* Environment parameters
+* Monitoring and alerting configuration
+
 ````
-
-| File                           | Purpose                                          |
-| ------------------------------ | ------------------------------------------------ |
-| `README.md`                    | ADF architecture and orchestration documentation |
-| `pipeline_retail_data.json`    | Representative ADF pipeline definition           |
-| `incremental_load.md`          | Incremental loading strategy                     |
-| `metadata/pipeline_config.csv` | Metadata configuration                           |
-
-## Technologies
-
-* Azure Data Factory
-* Azure Data Lake Storage Gen2
-* Azure Databricks
-* PySpark
-* Delta Lake
-* Azure Synapse Analytics
-* Power BI
