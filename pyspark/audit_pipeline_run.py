@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import (
@@ -8,55 +9,121 @@ from pyspark.sql.types import (
     LongType
 )
 
+
+# =========================================================
+# Spark Session
+# =========================================================
+
 spark = (
     SparkSession.builder
     .appName("RetailPipelineRunAudit")
     .getOrCreate()
 )
 
+
 # =========================================================
 # Parameters
 # =========================================================
 
-dbutils.widgets.text("audit_path", "control/pipeline_run_audit")
-dbutils.widgets.text("run_id", "")
-dbutils.widgets.text("pipeline_name", "")
-dbutils.widgets.text("source_name", "")
-dbutils.widgets.text("load_type", "")
-dbutils.widgets.text("status", "")
-dbutils.widgets.text("start_time", "")
-dbutils.widgets.text("end_time", "")
-dbutils.widgets.text("source_record_count", "0")
-dbutils.widgets.text("bronze_record_count", "0")
-dbutils.widgets.text("silver_record_count", "0")
-dbutils.widgets.text("rejected_record_count", "0")
-dbutils.widgets.text("watermark_start", "")
-dbutils.widgets.text("watermark_end", "")
-dbutils.widgets.text("error_message", "")
+dbutils.widgets.text(
+    "audit_path",
+    "control/pipeline_run_audit"
+)
 
-audit_path = dbutils.widgets.get("audit_path").strip()
-run_id = dbutils.widgets.get("run_id").strip()
-pipeline_name = dbutils.widgets.get("pipeline_name").strip()
-source_name = dbutils.widgets.get("source_name").strip()
-load_type = dbutils.widgets.get("load_type").strip()
-status = dbutils.widgets.get("status").strip()
-start_time = dbutils.widgets.get("start_time").strip()
-end_time = dbutils.widgets.get("end_time").strip()
+dbutils.widgets.text(
+    "run_id",
+    ""
+)
 
-source_record_count = dbutils.widgets.get(
-    "source_record_count"
+dbutils.widgets.text(
+    "pipeline_name",
+    ""
+)
+
+dbutils.widgets.text(
+    "source_name",
+    "RETAIL_PIPELINE"
+)
+
+dbutils.widgets.text(
+    "load_type",
+    "MULTI_SOURCE"
+)
+
+dbutils.widgets.text(
+    "status",
+    ""
+)
+
+dbutils.widgets.text(
+    "start_time",
+    ""
+)
+
+dbutils.widgets.text(
+    "end_time",
+    ""
+)
+
+dbutils.widgets.text(
+    "metrics_json",
+    "{}"
+)
+
+dbutils.widgets.text(
+    "watermark_start",
+    ""
+)
+
+dbutils.widgets.text(
+    "watermark_end",
+    ""
+)
+
+dbutils.widgets.text(
+    "error_message",
+    ""
+)
+
+
+# =========================================================
+# Read parameters
+# =========================================================
+
+audit_path = dbutils.widgets.get(
+    "audit_path"
 ).strip()
 
-bronze_record_count = dbutils.widgets.get(
-    "bronze_record_count"
+run_id = dbutils.widgets.get(
+    "run_id"
 ).strip()
 
-silver_record_count = dbutils.widgets.get(
-    "silver_record_count"
+pipeline_name = dbutils.widgets.get(
+    "pipeline_name"
 ).strip()
 
-rejected_record_count = dbutils.widgets.get(
-    "rejected_record_count"
+source_name = dbutils.widgets.get(
+    "source_name"
+).strip()
+
+load_type = dbutils.widgets.get(
+    "load_type"
+).strip()
+
+status = dbutils.widgets.get(
+    "status"
+).strip()
+
+start_time = dbutils.widgets.get(
+    "start_time"
+).strip()
+
+end_time = dbutils.widgets.get(
+    "end_time"
+).strip()
+
+metrics_json = dbutils.widgets.get(
+    "metrics_json"
 ).strip()
 
 watermark_start = dbutils.widgets.get(
@@ -71,58 +138,82 @@ error_message = dbutils.widgets.get(
     "error_message"
 ).strip()
 
+
 # =========================================================
-# Validation
+# Validate required parameters
 # =========================================================
 
 if not audit_path:
-    raise ValueError("audit_path cannot be empty")
+    raise ValueError(
+        "audit_path cannot be empty"
+    )
 
 if not run_id:
-    raise ValueError("run_id cannot be empty")
+    raise ValueError(
+        "run_id cannot be empty"
+    )
 
 if not pipeline_name:
-    raise ValueError("pipeline_name cannot be empty")
-
-if not source_name:
-    raise ValueError("source_name cannot be empty")
+    raise ValueError(
+        "pipeline_name cannot be empty"
+    )
 
 if not status:
-    raise ValueError("status cannot be empty")
+    raise ValueError(
+        "status cannot be empty"
+    )
 
 
-def parse_long(value, field_name):
-    if value is None or value == "":
-        return 0
+# =========================================================
+# Parse metrics JSON
+# =========================================================
 
-    try:
-        return int(value)
-    except ValueError:
-        raise ValueError(
-            f"{field_name} must be a valid integer. "
-            f"Received: {value}"
-        )
+try:
+
+    metrics = json.loads(
+        metrics_json
+    )
+
+except json.JSONDecodeError as exc:
+
+    raise ValueError(
+        "metrics_json must contain valid JSON. "
+        f"Received: {metrics_json}"
+    ) from exc
 
 
-source_record_count_value = parse_long(
-    source_record_count,
-    "source_record_count"
+# =========================================================
+# Safely extract metrics
+# =========================================================
+
+source_record_count = int(
+    metrics.get(
+        "source_record_count",
+        0
+    )
 )
 
-bronze_record_count_value = parse_long(
-    bronze_record_count,
-    "bronze_record_count"
+bronze_record_count = int(
+    metrics.get(
+        "bronze_record_count",
+        0
+    )
 )
 
-silver_record_count_value = parse_long(
-    silver_record_count,
-    "silver_record_count"
+silver_record_count = int(
+    metrics.get(
+        "silver_record_count",
+        0
+    )
 )
 
-rejected_record_count_value = parse_long(
-    rejected_record_count,
-    "rejected_record_count"
+rejected_record_count = int(
+    metrics.get(
+        "rejected_record_count",
+        0
+    )
 )
+
 
 # =========================================================
 # Audit timestamp
@@ -130,29 +221,93 @@ rejected_record_count_value = parse_long(
 
 audit_recorded_at = datetime.now(
     timezone.utc
-).strftime("%Y-%m-%dT%H:%M:%SZ")
+).strftime(
+    "%Y-%m-%dT%H:%M:%SZ"
+)
+
 
 # =========================================================
 # Audit schema
 # =========================================================
 
 audit_schema = StructType([
-    StructField("RunId", StringType(), False),
-    StructField("PipelineName", StringType(), False),
-    StructField("SourceName", StringType(), False),
-    StructField("LoadType", StringType(), True),
-    StructField("StartTime", StringType(), True),
-    StructField("EndTime", StringType(), True),
-    StructField("Status", StringType(), False),
-    StructField("SourceRecordCount", LongType(), True),
-    StructField("BronzeRecordCount", LongType(), True),
-    StructField("SilverRecordCount", LongType(), True),
-    StructField("RejectedRecordCount", LongType(), True),
-    StructField("WatermarkStart", StringType(), True),
-    StructField("WatermarkEnd", StringType(), True),
-    StructField("ErrorMessage", StringType(), True),
-    StructField("AuditRecordedAt", StringType(), False)
+    StructField(
+        "RunId",
+        StringType(),
+        False
+    ),
+    StructField(
+        "PipelineName",
+        StringType(),
+        False
+    ),
+    StructField(
+        "SourceName",
+        StringType(),
+        False
+    ),
+    StructField(
+        "LoadType",
+        StringType(),
+        True
+    ),
+    StructField(
+        "StartTime",
+        StringType(),
+        True
+    ),
+    StructField(
+        "EndTime",
+        StringType(),
+        True
+    ),
+    StructField(
+        "Status",
+        StringType(),
+        False
+    ),
+    StructField(
+        "SourceRecordCount",
+        LongType(),
+        True
+    ),
+    StructField(
+        "BronzeRecordCount",
+        LongType(),
+        True
+    ),
+    StructField(
+        "SilverRecordCount",
+        LongType(),
+        True
+    ),
+    StructField(
+        "RejectedRecordCount",
+        LongType(),
+        True
+    ),
+    StructField(
+        "WatermarkStart",
+        StringType(),
+        True
+    ),
+    StructField(
+        "WatermarkEnd",
+        StringType(),
+        True
+    ),
+    StructField(
+        "ErrorMessage",
+        StringType(),
+        True
+    ),
+    StructField(
+        "AuditRecordedAt",
+        StringType(),
+        False
+    )
 ])
+
 
 # =========================================================
 # Create audit record
@@ -166,20 +321,22 @@ audit_record = [(
     start_time,
     end_time,
     status,
-    source_record_count_value,
-    bronze_record_count_value,
-    silver_record_count_value,
-    rejected_record_count_value,
+    source_record_count,
+    bronze_record_count,
+    silver_record_count,
+    rejected_record_count,
     watermark_start,
     watermark_end,
     error_message,
     audit_recorded_at
 )]
 
+
 audit_df = spark.createDataFrame(
     audit_record,
     audit_schema
 )
+
 
 # =========================================================
 # Write audit record
@@ -193,6 +350,7 @@ audit_df = spark.createDataFrame(
     .save(audit_path)
 )
 
+
 # =========================================================
 # Verification
 # =========================================================
@@ -201,32 +359,86 @@ print("=" * 80)
 print("PIPELINE RUN AUDIT")
 print("=" * 80)
 
-print(f"Run ID               : {run_id}")
-print(f"Pipeline             : {pipeline_name}")
-print(f"Source               : {source_name}")
-print(f"Load Type            : {load_type}")
-print(f"Status               : {status}")
-print(f"Source Records       : {source_record_count_value}")
-print(f"Bronze Records       : {bronze_record_count_value}")
-print(f"Silver Records       : {silver_record_count_value}")
-print(f"Rejected Records     : {rejected_record_count_value}")
-print(f"Watermark Start      : {watermark_start}")
-print(f"Watermark End        : {watermark_end}")
-print(f"Audit Recorded At    : {audit_recorded_at}")
+print(
+    f"Run ID               : {run_id}"
+)
+
+print(
+    f"Pipeline             : {pipeline_name}"
+)
+
+print(
+    f"Source               : {source_name}"
+)
+
+print(
+    f"Load Type            : {load_type}"
+)
+
+print(
+    f"Status               : {status}"
+)
+
+print(
+    f"Source Records       : {source_record_count}"
+)
+
+print(
+    f"Bronze Records       : {bronze_record_count}"
+)
+
+print(
+    f"Silver Records       : {silver_record_count}"
+)
+
+print(
+    f"Rejected Records     : {rejected_record_count}"
+)
+
+print(
+    f"Watermark Start      : {watermark_start}"
+)
+
+print(
+    f"Watermark End        : {watermark_end}"
+)
+
+print(
+    f"Audit Recorded At    : {audit_recorded_at}"
+)
 
 if error_message:
-    print(f"Error Message        : {error_message}")
 
-print(f"Audit Delta Path     : {audit_path}")
+    print(
+        f"Error Message        : {error_message}"
+    )
+
+print(
+    f"Audit Delta Path     : {audit_path}"
+)
 
 print("=" * 80)
-print("PIPELINE RUN AUDIT WRITTEN SUCCESSFULLY")
+print(
+    "PIPELINE RUN AUDIT WRITTEN SUCCESSFULLY"
+)
 print("=" * 80)
+
 
 # =========================================================
 # Return result to ADF
 # =========================================================
 
+result = {
+    "run_id": run_id,
+    "pipeline_name": pipeline_name,
+    "status": status,
+    "audit_path": audit_path,
+    "source_record_count": source_record_count,
+    "bronze_record_count": bronze_record_count,
+    "silver_record_count": silver_record_count,
+    "rejected_record_count": rejected_record_count
+}
+
 dbutils.notebook.exit(
-    "AUDIT_RECORDED"
+    json.dumps(result)
 )
