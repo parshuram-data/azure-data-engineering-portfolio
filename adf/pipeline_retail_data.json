@@ -1,7 +1,7 @@
 {
   "name": "pipeline_retail_data",
   "properties": {
-    "description": "Metadata-driven retail ingestion pipeline with incremental watermark processing, Bronze to Silver transformation, watermark state management, data quality validation, reconciliation checks, Gold publishing, and pipeline run auditing.",
+    "description": "Metadata-driven retail ingestion pipeline with incremental watermark processing, Bronze to Silver transformation, watermark state management, per-source runtime auditing, data quality validation, reconciliation checks, Gold publishing, and pipeline run auditing.",
     "parameters": {
       "bronzeFolder": {
         "type": "String",
@@ -392,6 +392,74 @@
                     }
                   }
                 ]
+              }
+            },
+            {
+              "name": "Audit_Source_Run",
+              "type": "DatabricksNotebook",
+              "dependsOn": [
+                {
+                  "activity": "Update_Watermark_If_Incremental",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookPath": "/Shared/azure-data-engineering-portfolio/pyspark/audit_source_run",
+                "baseParameters": {
+                  "audit_path": {
+                    "value": "@pipeline().parameters.auditControlPath",
+                    "type": "Expression"
+                  },
+                  "run_id": {
+                    "value": "@pipeline().RunId",
+                    "type": "Expression"
+                  },
+                  "pipeline_name": {
+                    "value": "@pipeline().Pipeline",
+                    "type": "Expression"
+                  },
+                  "source_name": {
+                    "value": "@items('ForEach_Source_Table').SourceName",
+                    "type": "Expression"
+                  },
+                  "load_type": {
+                    "value": "@items('ForEach_Source_Table').LoadType",
+                    "type": "Expression"
+                  },
+                  "status": {
+                    "value": "@json(activity('Bronze_To_Silver_Databricks').output.runOutput).status",
+                    "type": "Expression"
+                  },
+                  "start_time": {
+                    "value": "@pipeline().TriggerTime",
+                    "type": "Expression"
+                  },
+                  "end_time": {
+                    "value": "@utcnow()",
+                    "type": "Expression"
+                  },
+                  "metrics_json": {
+                    "value": "@activity('Bronze_To_Silver_Databricks').output.runOutput",
+                    "type": "Expression"
+                  },
+                  "error_message": {
+                    "value": "",
+                    "type": "Expression"
+                  }
+                }
+              },
+              "linkedServiceName": {
+                "referenceName": "LS_Databricks",
+                "type": "LinkedServiceReference"
               }
             }
           ]
