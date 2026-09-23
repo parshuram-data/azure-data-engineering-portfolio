@@ -550,20 +550,8 @@
               "value": "@utcnow()",
               "type": "Expression"
             },
-            "source_record_count": {
-              "value": "0",
-              "type": "Expression"
-            },
-            "bronze_record_count": {
-              "value": "0",
-              "type": "Expression"
-            },
-            "silver_record_count": {
-              "value": "0",
-              "type": "Expression"
-            },
-            "rejected_record_count": {
-              "value": "0",
+            "metrics_json": {
+              "value": "{\"source_record_count\":0,\"bronze_record_count\":0,\"silver_record_count\":0,\"rejected_record_count\":0}",
               "type": "Expression"
             },
             "watermark_start": {
