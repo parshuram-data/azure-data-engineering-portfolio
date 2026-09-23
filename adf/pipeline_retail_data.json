@@ -2,7 +2,6 @@
   "name": "PL_Retail_Data_Engineering",
   "properties": {
     "description": "Production-minded metadata-driven Azure Data Factory pipeline for the Retail Data Platform using ADLS Gen2, Databricks, PySpark, Delta Lake and Medallion architecture.",
-
     "parameters": {
       "bronzeFolder": {
         "type": "String",
@@ -17,13 +16,11 @@
         "defaultValue": "gold"
       }
     },
-
     "activities": [
       {
         "name": "Lookup_Source_Metadata",
         "type": "Lookup",
         "description": "Reads the centralized source configuration from pipeline_config.csv for metadata-driven ingestion.",
-
         "typeProperties": {
           "source": {
             "type": "DelimitedTextSource",
@@ -34,21 +31,17 @@
               "type": "DelimitedTextReadSettings"
             }
           },
-
           "dataset": {
             "referenceName": "ds_pipeline_config_csv",
             "type": "DatasetReference"
           },
-
           "firstRowOnly": false
         }
       },
-
       {
-        "name": "Filter_Invalid_Metadata",
-        "type": "Filter",
-        "description": "Identifies invalid metadata configurations before any source ingestion begins.",
-
+        "name": "Lookup_Watermark_State",
+        "type": "Lookup",
+        "description": "Reads the last successfully processed watermark for each configured source.",
         "dependsOn": [
           {
             "activity": "Lookup_Source_Metadata",
@@ -57,25 +50,50 @@
             ]
           }
         ],
-
+        "typeProperties": {
+          "source": {
+            "type": "DelimitedTextSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings"
+            },
+            "formatSettings": {
+              "type": "DelimitedTextReadSettings"
+            }
+          },
+          "dataset": {
+            "referenceName": "ds_watermark_state_csv",
+            "type": "DatasetReference"
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "Filter_Invalid_Metadata",
+        "type": "Filter",
+        "description": "Identifies invalid metadata configurations before source ingestion begins.",
+        "dependsOn": [
+          {
+            "activity": "Lookup_Watermark_State",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
         "typeProperties": {
           "items": {
             "value": "@activity('Lookup_Source_Metadata').output.value",
             "type": "Expression"
           },
-
           "condition": {
-            "value": "@or(empty(item().SourceName),empty(item().SourceType),not(equals(toLower(trim(item().SourceType)),'csv')),empty(item().SourcePath),empty(item().TargetPath),or(not(equals(toLower(trim(item().LoadType)),'full')),not(equals(toLower(trim(item().LoadType)),'incremental'))),and(equals(toLower(trim(item().LoadType)),'incremental'),empty(item().WatermarkColumn)),not(equals(toLower(trim(item().TargetLayer)),'bronze')),or(not(equals(toLower(trim(item().IsActive)),'true')),not(equals(toLower(trim(item().IsActive)),'false'))))",
+            "value": "@or(empty(item().SourceName),empty(item().SourceType),not(equals(toLower(trim(item().SourceType)),'csv')),empty(item().SourcePath),empty(item().TargetPath),and(not(equals(toLower(trim(item().LoadType)),'full')),not(equals(toLower(trim(item().LoadType)),'incremental'))),and(equals(toLower(trim(item().LoadType)),'incremental'),empty(item().WatermarkColumn)),not(equals(toLower(trim(item().TargetLayer)),'bronze')),and(not(equals(toLower(trim(item().IsActive)),'true')),not(equals(toLower(trim(item().IsActive)),'false'))))",
             "type": "Expression"
           }
         }
       },
-
       {
         "name": "Validate_Metadata",
         "type": "IfCondition",
         "description": "Stops the pipeline when one or more metadata configuration records fail validation.",
-
         "dependsOn": [
           {
             "activity": "Filter_Invalid_Metadata",
@@ -84,19 +102,16 @@
             ]
           }
         ],
-
         "typeProperties": {
           "expression": {
             "value": "@greater(length(activity('Filter_Invalid_Metadata').output.value),0)",
             "type": "Expression"
           },
-
           "ifTrueActivities": [
             {
               "name": "Fail_Invalid_Metadata",
               "type": "Fail",
               "description": "Fails the pipeline because invalid metadata configuration was detected.",
-
               "typeProperties": {
                 "errorCode": "ADF_METADATA_VALIDATION_FAILED",
                 "message": "One or more source metadata records failed validation. Review pipeline_config.csv before running ingestion."
@@ -105,12 +120,10 @@
           ]
         }
       },
-
       {
         "name": "Filter_Active_Sources",
         "type": "Filter",
         "description": "Processes only active and validated source configurations.",
-
         "dependsOn": [
           {
             "activity": "Validate_Metadata",
@@ -119,25 +132,21 @@
             ]
           }
         ],
-
         "typeProperties": {
           "items": {
             "value": "@activity('Lookup_Source_Metadata').output.value",
             "type": "Expression"
           },
-
           "condition": {
             "value": "@equals(toLower(trim(item().IsActive)),'true')",
             "type": "Expression"
           }
         }
       },
-
       {
         "name": "ForEach_Source_Table",
         "type": "ForEach",
         "description": "Iterates through active source configurations and executes ingestion dynamically.",
-
         "dependsOn": [
           {
             "activity": "Filter_Active_Sources",
@@ -146,22 +155,18 @@
             ]
           }
         ],
-
         "typeProperties": {
           "items": {
             "value": "@activity('Filter_Active_Sources').output.value",
             "type": "Expression"
           },
-
           "isSequential": false,
           "batchCount": 4,
-
           "activities": [
             {
               "name": "Copy_To_Bronze",
               "type": "Copy",
               "description": "Copies the configured source file into the ADLS Gen2 Bronze layer using metadata-driven source and target paths.",
-
               "typeProperties": {
                 "source": {
                   "type": "DelimitedTextSource",
@@ -172,7 +177,6 @@
                     "type": "DelimitedTextReadSettings"
                   }
                 },
-
                 "sink": {
                   "type": "DelimitedTextSink",
                   "storeSettings": {
@@ -184,9 +188,7 @@
                     "fileExtension": ".csv"
                   }
                 },
-
                 "enableStaging": false,
-
                 "translator": {
                   "type": "TabularTranslator",
                   "typeConversion": true,
@@ -196,18 +198,15 @@
                   }
                 }
               },
-
               "inputs": [
                 {
                   "referenceName": "ds_retail_source_csv",
                   "type": "DatasetReference",
-
                   "parameters": {
                     "filePath": {
                       "value": "@if(equals(lastIndexOf(item().SourcePath,'/'),-1),'',substring(item().SourcePath,0,lastIndexOf(item().SourcePath,'/')))",
                       "type": "Expression"
                     },
-
                     "fileName": {
                       "value": "@if(equals(lastIndexOf(item().SourcePath,'/'),-1),item().SourcePath,substring(item().SourcePath,add(lastIndexOf(item().SourcePath,'/'),1),sub(length(item().SourcePath),add(lastIndexOf(item().SourcePath,'/'),1))))",
                       "type": "Expression"
@@ -215,18 +214,15 @@
                   }
                 }
               ],
-
               "outputs": [
                 {
                   "referenceName": "ds_retail_bronze_csv",
                   "type": "DatasetReference",
-
                   "parameters": {
                     "folderPath": {
                       "value": "@concat(pipeline().parameters.bronzeFolder,'/',item().TargetPath)",
                       "type": "Expression"
                     },
-
                     "fileName": {
                       "value": "@concat(item().SourceName,'.csv')",
                       "type": "Expression"
@@ -238,12 +234,10 @@
           ]
         }
       },
-
       {
         "name": "Bronze_To_Silver_Databricks",
         "type": "DatabricksNotebook",
         "description": "Transforms Bronze data using PySpark, applies standardization and deduplication, and writes curated Delta datasets to the Silver layer.",
-
         "dependsOn": [
           {
             "activity": "ForEach_Source_Table",
@@ -252,16 +246,13 @@
             ]
           }
         ],
-
         "typeProperties": {
           "notebookPath": "/Shared/azure-data-engineering-portfolio/bronze_to_silver",
-
           "baseParameters": {
             "source_path": {
               "value": "@pipeline().parameters.bronzeFolder",
               "type": "Expression"
             },
-
             "target_path": {
               "value": "@pipeline().parameters.silverFolder",
               "type": "Expression"
@@ -269,12 +260,10 @@
           }
         }
       },
-
       {
         "name": "Data_Quality_Checks",
         "type": "DatabricksNotebook",
         "description": "Executes Silver-layer data quality checks for null values, duplicate keys and invalid business values.",
-
         "dependsOn": [
           {
             "activity": "Bronze_To_Silver_Databricks",
@@ -283,10 +272,8 @@
             ]
           }
         ],
-
         "typeProperties": {
           "notebookPath": "/Shared/azure-data-engineering-portfolio/data_quality_checks",
-
           "baseParameters": {
             "input_path": {
               "value": "@pipeline().parameters.silverFolder",
@@ -295,12 +282,10 @@
           }
         }
       },
-
       {
         "name": "Silver_To_Gold_Databricks",
         "type": "DatabricksNotebook",
         "description": "Creates analytics-ready Gold Delta datasets from validated Silver data for downstream reporting and analytics.",
-
         "dependsOn": [
           {
             "activity": "Data_Quality_Checks",
@@ -309,16 +294,13 @@
             ]
           }
         ],
-
         "typeProperties": {
           "notebookPath": "/Shared/azure-data-engineering-portfolio/silver_to_gold",
-
           "baseParameters": {
             "source_path": {
               "value": "@pipeline().parameters.silverFolder",
               "type": "Expression"
             },
-
             "target_path": {
               "value": "@pipeline().parameters.goldFolder",
               "type": "Expression"
@@ -326,12 +308,10 @@
           }
         }
       },
-
       {
         "name": "Pipeline_Failure_Handling",
         "type": "WebActivity",
         "description": "Placeholder for integration with an enterprise notification mechanism such as Azure Logic Apps, Microsoft Teams or email.",
-
         "dependsOn": [
           {
             "activity": "Silver_To_Gold_Databricks",
@@ -340,11 +320,9 @@
             ]
           }
         ],
-
         "typeProperties": {
           "method": "POST",
           "url": "https://example.com/ADF-Failure-Notification",
-
           "body": {
             "pipeline": "@{pipeline().Pipeline}",
             "runId": "@{pipeline().RunId}",
