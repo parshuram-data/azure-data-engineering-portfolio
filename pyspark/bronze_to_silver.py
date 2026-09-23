@@ -1,3 +1,5 @@
+import json
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col,
@@ -5,7 +7,8 @@ from pyspark.sql.functions import (
     upper,
     to_date,
     to_timestamp,
-    lit
+    lit,
+    max as spark_max
 )
 from pyspark.sql.types import IntegerType, DoubleType
 from delta.tables import DeltaTable
@@ -42,6 +45,39 @@ last_successful_watermark = dbutils.widgets.get(
     "last_successful_watermark"
 ).strip()
 
+
+# ============================================================
+# Helper: Return Result to ADF
+# ============================================================
+
+def return_result(
+    source_name,
+    old_watermark,
+    new_watermark,
+    records_processed,
+    status,
+    message=""
+):
+    result = {
+        "source_name": source_name,
+        "old_watermark": old_watermark,
+        "new_watermark": new_watermark,
+        "records_processed": records_processed,
+        "status": status,
+        "message": message
+    }
+
+    print("Databricks activity result:")
+    print(json.dumps(result, indent=2))
+
+    dbutils.notebook.exit(
+        json.dumps(result)
+    )
+
+
+# ============================================================
+# Logging
+# ============================================================
 
 print("============================================================")
 print("Retail Bronze → Silver Processing")
@@ -84,6 +120,7 @@ if load_type not in supported_load_types:
     )
 
 if load_type == "incremental":
+
     if not watermark_column:
         raise ValueError(
             f"Watermark column is required for incremental source: "
@@ -103,30 +140,24 @@ if load_type == "incremental":
 
 source_config = {
     "customers": {
-        "primary_key": "customer_id",
-        "date_columns": ["signup_date"]
+        "primary_key": "customer_id"
     },
     "products": {
-        "primary_key": "product_id",
-        "date_columns": []
+        "primary_key": "product_id"
     },
     "orders": {
-        "primary_key": "order_id",
-        "date_columns": ["order_date"]
+        "primary_key": "order_id"
     },
     "payments": {
-        "primary_key": "payment_id",
-        "date_columns": ["payment_date"]
+        "primary_key": "payment_id"
     }
 }
 
-
-config = source_config[source_name]
-primary_key = config["primary_key"]
+primary_key = source_config[source_name]["primary_key"]
 
 
 # ============================================================
-# Read Current Source from Bronze
+# Read Bronze
 # ============================================================
 
 input_file = f"{bronze_source_path}/{source_name}.csv"
@@ -140,11 +171,12 @@ df = (
     .csv(input_file)
 )
 
-
 source_record_count = df.count()
 
-print(f"Bronze source record count: {source_record_count}")
-
+print(
+    f"Bronze source record count: "
+    f"{source_record_count}"
+)
 
 if source_record_count == 0:
     raise ValueError(
@@ -153,7 +185,7 @@ if source_record_count == 0:
 
 
 # ============================================================
-# Apply Incremental Watermark
+# Apply Watermark
 # ============================================================
 
 if load_type == "incremental":
@@ -196,174 +228,225 @@ if load_type == "incremental":
 
 else:
 
-    print("Full load selected. No watermark filter applied.")
+    print(
+        "Full load selected. "
+        "No watermark filter applied."
+    )
 
     filtered_record_count = df.count()
 
 
 # ============================================================
-# Handle Empty Incremental Result
+# No New Data
 # ============================================================
 
 if filtered_record_count == 0:
 
     print(
-        f"No new records found for source '{source_name}'. "
-        "Silver table will not be modified."
+        f"No new records found for source '{source_name}'."
     )
 
-    print("============================================================")
-    print("Bronze → Silver processing completed with no new records.")
-    print("============================================================")
+    return_result(
+        source_name=source_name,
+        old_watermark=last_successful_watermark,
+        new_watermark=last_successful_watermark,
+        records_processed=0,
+        status="SUCCESS",
+        message="No new records found. Existing Silver data was not modified."
+    )
 
-    spark.stop()
+
+# ============================================================
+# Source-Specific Transformations
+# ============================================================
+
+if source_name == "customers":
+
+    silver_df = (
+        df
+        .withColumn(
+            "customer_name",
+            trim(col("customer_name"))
+        )
+        .withColumn(
+            "city",
+            trim(col("city"))
+        )
+        .withColumn(
+            "state",
+            trim(col("state"))
+        )
+        .withColumn(
+            "signup_date",
+            to_date(col("signup_date"))
+        )
+        .dropDuplicates(["customer_id"])
+    )
+
+
+elif source_name == "products":
+
+    silver_df = (
+        df
+        .withColumn(
+            "product_name",
+            trim(col("product_name"))
+        )
+        .withColumn(
+            "category",
+            upper(trim(col("category")))
+        )
+        .withColumn(
+            "price",
+            col("price").cast(DoubleType())
+        )
+        .filter(
+            col("price") >= 0
+        )
+        .dropDuplicates(["product_id"])
+    )
+
+
+elif source_name == "orders":
+
+    silver_df = (
+        df
+        .withColumn(
+            "order_date",
+            to_date(col("order_date"))
+        )
+        .withColumn(
+            "status",
+            upper(trim(col("status")))
+        )
+        .withColumn(
+            "quantity",
+            col("quantity").cast(IntegerType())
+        )
+        .withColumn(
+            "unit_price",
+            col("unit_price").cast(DoubleType())
+        )
+        .filter(
+            col("quantity") > 0
+        )
+        .filter(
+            col("unit_price") >= 0
+        )
+        .dropDuplicates(["order_id"])
+    )
+
+
+elif source_name == "payments":
+
+    silver_df = (
+        df
+        .withColumn(
+            "payment_date",
+            to_date(col("payment_date"))
+        )
+        .withColumn(
+            "payment_method",
+            upper(trim(col("payment_method")))
+        )
+        .withColumn(
+            "payment_status",
+            upper(trim(col("payment_status")))
+        )
+        .withColumn(
+            "amount",
+            col("amount").cast(DoubleType())
+        )
+        .filter(
+            col("amount") >= 0
+        )
+        .dropDuplicates(["payment_id"])
+    )
+
+
+# ============================================================
+# Validate Transformed Data
+# ============================================================
+
+silver_record_count = silver_df.count()
+
+print(
+    f"Silver records after transformation: "
+    f"{silver_record_count}"
+)
+
+if silver_record_count == 0:
+    raise ValueError(
+        f"Source '{source_name}' produced zero valid Silver records."
+    )
+
+
+# ============================================================
+# Silver Target
+# ============================================================
+
+target_path = f"{silver_path}/{source_name}"
+
+print(
+    f"Silver target path: {target_path}"
+)
+
+
+# ============================================================
+# Write Silver
+# ============================================================
+
+if load_type == "full":
+
+    print(
+        "Executing FULL load into Silver."
+    )
+
+    (
+        silver_df
+        .write
+        .format("delta")
+        .mode("overwrite")
+        .option(
+            "overwriteSchema",
+            "true"
+        )
+        .save(target_path)
+    )
 
 else:
 
-    # ========================================================
-    # Source-Specific Transformations
-    # ========================================================
-
-    if source_name == "customers":
-
-        silver_df = (
-            df
-            .withColumn(
-                "customer_name",
-                trim(col("customer_name"))
-            )
-            .withColumn(
-                "city",
-                trim(col("city"))
-            )
-            .withColumn(
-                "state",
-                trim(col("state"))
-            )
-            .withColumn(
-                "signup_date",
-                to_date(col("signup_date"))
-            )
-            .dropDuplicates(["customer_id"])
-        )
-
-
-    elif source_name == "products":
-
-        silver_df = (
-            df
-            .withColumn(
-                "product_name",
-                trim(col("product_name"))
-            )
-            .withColumn(
-                "category",
-                upper(trim(col("category")))
-            )
-            .withColumn(
-                "price",
-                col("price").cast(DoubleType())
-            )
-            .filter(
-                col("price") >= 0
-            )
-            .dropDuplicates(["product_id"])
-        )
-
-
-    elif source_name == "orders":
-
-        silver_df = (
-            df
-            .withColumn(
-                "order_date",
-                to_date(col("order_date"))
-            )
-            .withColumn(
-                "status",
-                upper(trim(col("status")))
-            )
-            .withColumn(
-                "quantity",
-                col("quantity").cast(IntegerType())
-            )
-            .withColumn(
-                "unit_price",
-                col("unit_price").cast(DoubleType())
-            )
-            .filter(
-                col("quantity") > 0
-            )
-            .filter(
-                col("unit_price") >= 0
-            )
-            .dropDuplicates(["order_id"])
-        )
-
-
-    elif source_name == "payments":
-
-        silver_df = (
-            df
-            .withColumn(
-                "payment_date",
-                to_date(col("payment_date"))
-            )
-            .withColumn(
-                "payment_method",
-                upper(trim(col("payment_method")))
-            )
-            .withColumn(
-                "payment_status",
-                upper(trim(col("payment_status")))
-            )
-            .withColumn(
-                "amount",
-                col("amount").cast(DoubleType())
-            )
-            .filter(
-                col("amount") >= 0
-            )
-            .dropDuplicates(["payment_id"])
-        )
-
-
-    # ========================================================
-    # Silver Target
-    # ========================================================
-
-    target_path = f"{silver_path}/{source_name}"
-
-    silver_record_count = silver_df.count()
-
     print(
-        f"Silver records after transformation: "
-        f"{silver_record_count}"
+        "Executing INCREMENTAL MERGE into Silver."
     )
 
-    if silver_record_count == 0:
+    if DeltaTable.isDeltaTable(
+        spark,
+        target_path
+    ):
 
-        raise ValueError(
-            f"Source '{source_name}' produced zero valid Silver records."
+        delta_table = DeltaTable.forPath(
+            spark,
+            target_path
         )
 
+        (
+            delta_table.alias("target")
+            .merge(
+                silver_df.alias("source"),
+                f"target.{primary_key} = "
+                f"source.{primary_key}"
+            )
+            .whenMatchedUpdateAll()
+            .whenNotMatchedInsertAll()
+            .execute()
+        )
 
-    # ========================================================
-    # Write Strategy
-    #
-    # Full:
-    #   Replace target.
-    #
-    # Incremental:
-    #   MERGE using source primary key.
-    #   Existing records are updated.
-    #   New records are inserted.
-    # ========================================================
-
-    if load_type == "full":
+    else:
 
         print(
-            f"Executing FULL load into Silver: {target_path}"
+            "Silver Delta table does not exist. "
+            "Creating the initial Delta table."
         )
 
         (
@@ -371,77 +454,102 @@ else:
             .write
             .format("delta")
             .mode("overwrite")
-            .option("overwriteSchema", "true")
+            .option(
+                "overwriteSchema",
+                "true"
+            )
             .save(target_path)
         )
 
-    else:
 
-        print(
-            f"Executing INCREMENTAL MERGE into Silver: "
-            f"{target_path}"
-        )
+# ============================================================
+# Calculate New Watermark
+# ============================================================
 
-        if DeltaTable.isDeltaTable(
-            spark,
-            target_path
-        ):
+new_watermark = last_successful_watermark
 
-            delta_table = DeltaTable.forPath(
-                spark,
-                target_path
-            )
+if load_type == "incremental":
 
-            (
-                delta_table.alias("target")
-                .merge(
-                    silver_df.alias("source"),
-                    f"target.{primary_key} = "
-                    f"source.{primary_key}"
+    watermark_result = (
+        silver_df
+        .select(
+            spark_max(
+                to_timestamp(
+                    col(watermark_column)
                 )
-                .whenMatchedUpdateAll()
-                .whenNotMatchedInsertAll()
-                .execute()
-            )
-
-        else:
-
-            print(
-                "Silver Delta table does not exist. "
-                "Creating initial Delta table."
-            )
-
-            (
-                silver_df
-                .write
-                .format("delta")
-                .mode("overwrite")
-                .option("overwriteSchema", "true")
-                .save(target_path)
-            )
-
-
-    # ========================================================
-    # Final Counts
-    # ========================================================
-
-    final_record_count = (
-        spark.read
-        .format("delta")
-        .load(target_path)
-        .count()
+            ).alias("new_watermark")
+        )
+        .collect()[0]["new_watermark"]
     )
 
-    print("============================================================")
-    print("Bronze → Silver processing completed successfully.")
-    print(f"Source                  : {source_name}")
-    print(f"Load Type               : {load_type}")
-    print(f"Records Read            : {source_record_count}")
-    print(f"Records After Watermark : {filtered_record_count}")
-    print(f"Records Transformed     : {silver_record_count}")
-    print(f"Final Silver Records    : {final_record_count}")
-    print(f"Silver Path             : {target_path}")
-    print("============================================================")
+    if watermark_result is not None:
+
+        new_watermark = (
+            watermark_result
+            .strftime("%Y-%m-%d")
+        )
+
+else:
+
+    if watermark_column:
+
+        if watermark_column in silver_df.columns:
+
+            watermark_result = (
+                silver_df
+                .select(
+                    spark_max(
+                        to_timestamp(
+                            col(watermark_column)
+                        )
+                    ).alias("new_watermark")
+                )
+                .collect()[0]["new_watermark"]
+            )
+
+            if watermark_result is not None:
+
+                new_watermark = (
+                    watermark_result
+                    .strftime("%Y-%m-%d")
+                )
 
 
-spark.stop()
+# ============================================================
+# Final Silver Count
+# ============================================================
+
+final_record_count = (
+    spark.read
+    .format("delta")
+    .load(target_path)
+    .count()
+)
+
+
+# ============================================================
+# Successful Result
+# ============================================================
+
+print("============================================================")
+print("Bronze → Silver processing completed successfully.")
+print(f"Source                  : {source_name}")
+print(f"Load Type               : {load_type}")
+print(f"Records Read            : {source_record_count}")
+print(f"Records After Watermark : {filtered_record_count}")
+print(f"Records Transformed     : {silver_record_count}")
+print(f"Final Silver Records    : {final_record_count}")
+print(f"Old Watermark           : {last_successful_watermark}")
+print(f"New Watermark           : {new_watermark}")
+print(f"Silver Path             : {target_path}")
+print("============================================================")
+
+
+return_result(
+    source_name=source_name,
+    old_watermark=last_successful_watermark,
+    new_watermark=new_watermark,
+    records_processed=silver_record_count,
+    status="SUCCESS",
+    message="Source processed successfully and new watermark calculated."
+)
