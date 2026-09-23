@@ -1,7 +1,7 @@
 {
   "name": "pipeline_retail_data",
   "properties": {
-    "description": "Metadata-driven retail ingestion pipeline with incremental watermark processing, Bronze to Silver transformation, watermark state management, data quality validation, reconciliation checks, and Gold publishing.",
+    "description": "Metadata-driven retail ingestion pipeline with incremental watermark processing, Bronze to Silver transformation, watermark state management, data quality validation, reconciliation checks, Gold publishing, and pipeline run auditing.",
     "parameters": {
       "bronzeFolder": {
         "type": "String",
@@ -18,6 +18,10 @@
       "watermarkControlPath": {
         "type": "String",
         "defaultValue": "control/watermark_state"
+      },
+      "auditControlPath": {
+        "type": "String",
+        "defaultValue": "control/pipeline_run_audit"
       }
     },
     "activities": [
@@ -484,6 +488,94 @@
             },
             "gold_path": {
               "value": "@pipeline().parameters.goldFolder",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_Databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "Audit_Pipeline_Run",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Silver_To_Gold_Databricks",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookPath": "/Shared/azure-data-engineering-portfolio/pyspark/audit_pipeline_run",
+          "baseParameters": {
+            "audit_path": {
+              "value": "@pipeline().parameters.auditControlPath",
+              "type": "Expression"
+            },
+            "run_id": {
+              "value": "@pipeline().RunId",
+              "type": "Expression"
+            },
+            "pipeline_name": {
+              "value": "@pipeline().Pipeline",
+              "type": "Expression"
+            },
+            "source_name": {
+              "value": "RETAIL_PIPELINE",
+              "type": "Expression"
+            },
+            "load_type": {
+              "value": "MULTI_SOURCE",
+              "type": "Expression"
+            },
+            "status": {
+              "value": "SUCCESS",
+              "type": "Expression"
+            },
+            "start_time": {
+              "value": "@pipeline().TriggerTime",
+              "type": "Expression"
+            },
+            "end_time": {
+              "value": "@utcnow()",
+              "type": "Expression"
+            },
+            "source_record_count": {
+              "value": "0",
+              "type": "Expression"
+            },
+            "bronze_record_count": {
+              "value": "0",
+              "type": "Expression"
+            },
+            "silver_record_count": {
+              "value": "0",
+              "type": "Expression"
+            },
+            "rejected_record_count": {
+              "value": "0",
+              "type": "Expression"
+            },
+            "watermark_start": {
+              "value": "",
+              "type": "Expression"
+            },
+            "watermark_end": {
+              "value": "",
+              "type": "Expression"
+            },
+            "error_message": {
+              "value": "",
               "type": "Expression"
             }
           }
