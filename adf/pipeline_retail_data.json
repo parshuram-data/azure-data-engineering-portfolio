@@ -1,7 +1,7 @@
 {
   "name": "pipeline_retail_data",
   "properties": {
-    "description": "Metadata-driven retail ingestion pipeline with incremental watermark processing, Bronze to Silver transformation, watermark state management, data quality validation, and Gold publishing.",
+    "description": "Metadata-driven retail ingestion pipeline with incremental watermark processing, Bronze to Silver transformation, watermark state management, data quality validation, reconciliation checks, and Gold publishing.",
     "parameters": {
       "bronzeFolder": {
         "type": "String",
@@ -33,7 +33,7 @@
         },
         "typeProperties": {
           "source": {
-            "type": "DelimitedTextSource",
+            "type": "DelimitedTextSource"
           },
           "dataset": {
             "referenceName": "ds_pipeline_config_csv",
@@ -115,7 +115,7 @@
               "type": "Fail",
               "typeProperties": {
                 "errorCode": "INVALID_METADATA",
-                "message": "One or more active or configured metadata rows failed validation. Review pipeline_config.csv."
+                "message": "One or more metadata rows failed validation. Review pipeline_config.csv."
               }
             }
           ]
@@ -426,11 +426,43 @@
         }
       },
       {
-        "name": "Silver_To_Gold_Databricks",
+        "name": "Reconciliation_Checks",
         "type": "DatabricksNotebook",
         "dependsOn": [
           {
             "activity": "Data_Quality_Checks",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 60,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookPath": "/Shared/azure-data-engineering-portfolio/pyspark/reconciliation_checks",
+          "baseParameters": {
+            "silver_path": {
+              "value": "@pipeline().parameters.silverFolder",
+              "type": "Expression"
+            }
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "LS_Databricks",
+          "type": "LinkedServiceReference"
+        }
+      },
+      {
+        "name": "Silver_To_Gold_Databricks",
+        "type": "DatabricksNotebook",
+        "dependsOn": [
+          {
+            "activity": "Reconciliation_Checks",
             "dependencyConditions": [
               "Succeeded"
             ]
