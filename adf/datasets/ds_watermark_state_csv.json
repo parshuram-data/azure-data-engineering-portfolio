@@ -1,0 +1,48 @@
+{
+  "name": "ds_watermark_state_csv",
+  "properties": {
+    "description": "Control dataset used to read and maintain the last successfully processed watermark for each source in the retail ingestion framework.",
+    "linkedServiceName": {
+      "referenceName": "LS_ADLS_Gen2",
+      "type": "LinkedServiceReference"
+    },
+    "type": "DelimitedText",
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "folderPath": "adf/metadata",
+        "fileName": "watermark_state.csv"
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true,
+      "quoteChar": "\"",
+      "escapeChar": "\\"
+    },
+    "schema": [
+      {
+        "name": "SourceName",
+        "type": "String"
+      },
+      {
+        "name": "WatermarkColumn",
+        "type": "String"
+      },
+      {
+        "name": "LastSuccessfulWatermark",
+        "type": "String"
+      },
+      {
+        "name": "LastSuccessfulRunId",
+        "type": "String"
+      },
+      {
+        "name": "LastSuccessfulRunTime",
+        "type": "String"
+      },
+      {
+        "name": "Status",
+        "type": "String"
+      }
+    ]
+  }
+}
